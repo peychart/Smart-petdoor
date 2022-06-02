@@ -21,7 +21,7 @@
                         http://www.gnu.org/licenses/gpl-3.0.html
 */
 /********************************* Serial pins Management ***********************************
-  On the naster, the value of a serial gpio must be : (-1) * ( physicalSlaveGpioValue + 1 ).
+  On the master, the value of a serial gpio must be : (-1) * ( physicalSlaveGpioValue + 1 ).
   Examples:
     gpio 16 on slave is -17 on it's master,
     gpio  0 on slave is  -1 on it's master...
@@ -126,20 +126,20 @@ namespace Pins {  static bool _master(false), _slave(false);
       inline pin&         onPinChange           ( void(*f)() )       {_on_state_change=f; return *this;};
 
     private:
-      ulong               _counter, _nextBlink;     // delay counters;
-      bool                _changed;
-      String              _backupPrefix;
+      ulong              _counter, _nextBlink;      // delay counters;
+      bool               _changed;
+      String             _backupPrefix;
       void                (*_on_timeout)();
       void                (*_on_blinkup)();
       void                (*_on_blinkdown)();
       void                (*_on_state_change)();
 
-      inline bool         _isActive             ( void )             {return (at(G(ROUTE_PIN_GPIO))>size_t(-32767));};
-      bool                _restoreFromSD        ( String = "" );
-      inline void         _serialSendState      ( bool reponseExpected=true )
+      inline bool        _isActive              ( void )             {return (at(G(ROUTE_PIN_GPIO))>size_t(-32767));};
+      bool               _restoreFromSD         ( String = "" );
+      inline void        _serialSendState       ( bool reponseExpected=true )
                                                                      {if(Serial) Serial.print( (_master ?(reponseExpected ?G("S") :G("s")) :G("M")) + String(-gpio()-1,DEC) + G(":") + (isOn() ?G("1\n") :G("0\n")) );};
 
-      inline static bool  _isNow                ( ulong v )          {ulong ms(millis()); return((v<ms) && (ms-v)<60000UL);};  //<-- Because of millis() rollover.
+      inline static bool _isNow                 ( ulong v )          {ulong ms(millis()); return((v<ms) && (ms-v)<60000UL);};  //<-- Because of millis() rollover.
 
       friend class        pinsMap;
 };
@@ -179,15 +179,15 @@ class pinsMap : public std::vector<pin>
       inline pinsMap&     onPinChange           ( void(*f)() )       {for(auto &x :*this) x.onPinChange(f); return *this;};
 
     private:
-      pin                 _nullPin;
-      String              _backupPrefix, _serialInputString;
+      pin                _nullPin;
+      String             _backupPrefix, _serialInputString;
 
       inline pin&         at                    ( short v )          {for(auto &x: *this) if(x.gpio()==v) return x; return _nullPin;};
       inline pin&         at                    ( std::string v )    {for(auto &x: *this) if(x.name()==v) return x; return _nullPin;};
-      inline void         _setAllPinsOnSlave    ( void )             {if( master() ) for(auto &x: *this) if(x.isVirtual()) x._serialSendState( false );};
-      bool                _setSerialPin         ( void );
-      bool                _serialPinsTreatment  ( void );
-      inline static bool  _isInPins             ( std::string s )    {return(
+      inline void        _setAllPinsOnSlave     ( void )             {if( master() ) for(auto &x: *this) if(x.isVirtual()) x._serialSendState( false );};
+      bool               _setSerialPin          ( void );
+      bool               _serialPinsTreatment   ( void );
+      inline static bool _isInPins              ( std::string s )    {return(
             s==G(ROUTE_PIN_NAME)
         ||  s==G(ROUTE_PIN_GPIO)
         ||  s==G(ROUTE_PIN_MODE)

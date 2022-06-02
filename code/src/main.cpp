@@ -1,4 +1,4 @@
-/* WiFiPowerStrip C++ for ESP8266 (Version 3.0.0 - 2020/07)
+/* WiFiPowerStrip C++ for ESP8266 (Version 0.0.1 - 2022/05)
     <https://github.com/peychart/WiFiPowerStrip>
 
     Copyright (C) 2020  -  peychart
@@ -20,12 +20,8 @@
     Details of this licence are available online under:
                         http://www.gnu.org/licenses/gpl-3.0.html
 */
-//Reference: https://www.arduino.cc/en/Reference/HomePage
-//See: http://esp8266.github.io/Arduino/versions/2.1.0-rc1/doc/libraries.html
-//Librairies et cartes ESP8266 sur IDE Arduino: http://arduino.esp8266.com/stable/package_esp8266com_index.json
-//http://arduino-esp8266.readthedocs.io/en/latest/
 
-/*
+/* Tower Pro Micro Servo 9g SG90 :
 Envoi d'une impulsion haute d’une durée comprise entre 1,3 ms et 1,7 ms toutes les 20 ms,
 soit à la fréquence de 50 Hz, pour assurer un bon maintien en angle de l’axe du servomoteur.
 const short int minPeriodUs = 800;  //-> 800 us
@@ -54,7 +50,7 @@ ESP8266WebServer                    ESPWebServer(80);
 ESP8266HTTPUpdateServer             httpUpdater;
 
 #include "pins.h"
-pinsMap                             myPins;
+pinsMap                          myPins;
 
 #include "webPage.h"                //<-- definition of a web interface
 
@@ -79,15 +75,12 @@ untyped                             calendar;
 unsigned long                       next_set;
 short int                           next_state;
 
-inline static bool  _isNow( unsigned long v ) {unsigned long ms(millis()); return(v && (v<ms) && (ms-v)<60000UL);};  //<-- Because of millis() rollover.
-inline ulong         Now() {return( timeClient.isTimeSet() ?myTZ->toLocal(timeClient.getEpochTime()) :(millis()/1000UL) );}
+inline static bool  _isNow( unsigned long v )    {unsigned long ms(millis()); return(v && (v<ms) && (ms-v)<60000UL);};  //<-- Because of millis() rollover.
+inline ulong         Now()                       {return( timeClient.isTimeSet() ?myTZ->toLocal(timeClient.getEpochTime()) :(millis()/1000UL) );}
 inline bool          isSynchronizedTime(ulong t) {return(t>-1UL/10UL);}
-inline bool          isSynchronizedTime(void)   {return(Now()>-1UL/10UL);}
+inline bool          isSynchronizedTime(void)    {return(Now()>-1UL/10UL);}
 
 
-#define SERVO                       2
-#define RELAY                       0
-bool servoReverse(true), relayReverse(false); //according hardware...
 const unsigned long delta = 5L;
 volatile unsigned short angle(90-delta);
 const short int minPeriodUs = 800;  //-> 800 us
@@ -101,25 +94,23 @@ void initTimer() {
   timer1_attachInterrupt( onTimerISR );
   timer1_enable( TIM_DIV16, TIM_EDGE, TIM_SINGLE ); // 1ms = 5000 tips
   timer1_write( totalPeriod * milliTips );
-  pinMode( SERVO, OUTPUT );
-}
-
-void reboot() {
-  DEBUG_print(F("Restart needed!...\n"));
-  myPins.mustRestore(true).saveToSD();
-  ESP.restart();
 }
 
 void IRAM_ATTR onTimerISR() {
   static unsigned int v(0);
   if( v ) {
     timer1_write( totalPeriod * milliTips - v ); // 20000us/(1/80MHz*TIM_DIV16)) - v -> Freq. = 1/20ms
-    v = 0;
+    v=0;
   }else{
-    v = ( angle > 180 ?180 :angle );
-    v = ( minPeriodUs * milliTips) + ( v * milliTips * (maxPeriodUs-minPeriodUs) / 180 ); v /= 1000;
+    v=(angle>180 ?180 :angle); v=(minPeriodUs*milliTips) + (v*milliTips*(maxPeriodUs-minPeriodUs)/180); v/=1000;
     timer1_write( v );
-  }digitalWrite( SERVO, (servoReverse ?!v :v) );
+  }myPins( SERVOPIN ).set(v);
+}
+
+void reboot() {
+  DEBUG_print(F("Restart needed!...\n"));
+  myPins.mustRestore(true).saveToSD();
+  ESP.restart();
 }
 
 void onWiFiConnect() {
@@ -168,41 +159,33 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
 
 void onSwitch( void ) {
   static std::vector<bool> previous;
-  byte i(0); for(auto &x : myPins){ // Search for switch switched...
-    if(previous.size()<=i)
-      previous.push_back(false);
-    if(previous[i] != x.isOn()){    // it's me:
+  byte i(0); for(auto &x : myPins){ // Search for the switched switch...
+    if(previous.size()<=i) previous.push_back(false);
+    if(previous[i] != x.isOn()){    // it's me!
       previous[i] = x.isOn();
-#ifdef DEFAULT_MQTT_BROKER
-      myMqtt.send( x.isOn() ?G(PAYLOAD_ON) :G(PAYLOAD_OFF), STR(x.gpio()) + G("/" ROUTE_PIN_STATE) );
-#endif
+
+    // Then do it ...
       switch(i) {
         case 0: // set OUTPUT
           next_state = (x.isOn() ?-1 :-2); break;
         case 1: // set INPPUT
           next_state = (x.isOn() ? 1 : 2); break;
-      }  next_set=millis();
-      return;
-  }i++;}
-}
+      }next_set=millis();
 
-void setRelay(bool newVal=false){
-  static unsigned long next_relayStatus=0L;
-  if(newVal==true){
-    digitalWrite( RELAY, (relayReverse ?HIGH: LOW) ); //Relay on
-    next_relayStatus=millis() + 1000L;
-  }else if(_isNow(next_relayStatus)){
-    next_relayStatus=0L;
-    digitalWrite( RELAY, (relayReverse ?LOW: HIGH) ); //Relay off
-}}inline void setRelayOn() {setRelay(true);};
-
+    //And say it!
+    #ifdef DEFAULT_MQTT_BROKER
+      myMqtt.send( x.isOn() ?G(PAYLOAD_ON) :G(PAYLOAD_OFF), STR(x.gpio()) + G("/" ROUTE_PIN_STATE) );
+#endif
+     return;
+  }else i++;
+} }
 
 void ajustAngle(bool set=true, volatile unsigned short Angle=0){
   static unsigned long next_angle=0L; volatile unsigned short target=90;
   if( angle==target) {
     next_angle=0L;
     return;
-  } setRelayOn();
+  }myPins(RELAYPIN).set( true, 1000UL); // RELAY is on for 1s (at least)...
 
   if (set &&_isNow(next_angle)){
     if ( _isNow( ((unsigned long)(target-angle)*delta) + next_angle ) )
@@ -231,19 +214,10 @@ std::vector<std::string> pinFlashDef( String s ){ //Allows pins declaration on F
 }
 
 void setup() {
-  //initialisation des broches /pins init
-  pinMode( RELAY, OUTPUT );
-  initTimer();
-
   //Serial.begin(115200);
   Serial.begin(9600);
   while(!Serial);
   Serial.print(F("\n\nChipID(")); Serial.print(ESP.getChipId()); Serial.print(F(") says: Hello World!\n\n"));
-
-  //initialisation des broches /pins init
-  pinMode( RELAY, OUTPUT );
-  initTimer();
-  if(RELAY==3 || RELAY==1 || SERVO==3 || SERVO==1) Serial.end();
 
   //attachInterrupt(digitalPinToInterrupt(COUNTERPIN), counterInterrupt, FALLING);
 
@@ -273,20 +247,18 @@ void setup() {
   myWiFi.connect();
 
   myPins.set( pinFlashDef(OUTPUT_CONFIG) )
-  #ifdef POWER_LED
-        .set( pinFlashDef(POWER_LED) )
-  #endif
-  #ifdef WIFI_STA_LED
-        .set( pinFlashDef(WIFI_STA_LED) )
-  #endif
         .mode(OUTPUT)
-        .onPinChange( onSwitch )
         .restoreFromSD(F("out-gpio-"));
   (myPins.mustRestore() ?myPins.set() :myPins.set(false)).mustRestore(false).saveToSD();
   if( myPins.exist(1) || myPins.exist(3) ) Serial.end();
+  #ifdef POWER_LED
+    myPins.gpio(POWER_LED).set();
+  #endif
   #ifdef DEBUG
     for(auto &x : myPins) DEBUG_print((x.serializeJson() + G("\n")).c_str());
   #endif
+
+  initTimer();  // SERVO
 
    // Servers:
   setupWebServer();                    //--> Webui interface started...
@@ -368,7 +340,6 @@ void loop() {
 #endif
   nextSet();
   ajustAngle();
-  setRelay();
 }
 // ***********************************************************************************************
 

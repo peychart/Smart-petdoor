@@ -141,34 +141,38 @@ TimeChangeRule stdRule = {"CET",  Last, Sun, Oct, 1,  DEFAULTTIMEZONE * 60};
 
 
 #ifdef _MAIN_
-//#ifdef LEDS
 
-#define INPUT_CONFIG F("[\
-/*D7*/{\"13, \"" ROUTE_PIN_NAME "\": \"input\"}\
+#define OUTPUT_DOOR      "output" //virtual
+#define INPUT_DOOR       "input"  //virtual
+#define SWITCH            13      //D7
+#define RELAYPIN          4       //D2
+#define SERVOPIN          2       //D4
+#define RELAYPIN_REVERSE  false   //according hardware...
+#define SERVOPIN_REVERSE  true    //according hardware...
+//#define POWER_LED         16    //D0
+//#define WIFI_STA_LED      5     //D1
+
+#ifdef POWER_LED
+#define POWER_LED F("[\
+  {\"" POWER_LED "\": {\"" ROUTE_PIN_NAME "\": \"PowerLed\", \"" ROUTE_PIN_HIDDEN "\": true, \"" ROUTE_PIN_BLINKING "\": true, \"" ROUTE_PIN_BLINKING_UP "\": 1000, \"" ROUTE_PIN_BLINKING_DOWN "\": 0, \"" ROUTE_PIN_STATE "\": true }}\
 ]")
+#endif
 
-//#define POWER_LED_NAME      "PowerLed"
-//#define WIFI_STA_LED_NAME   "WiFiLed"
+#ifdef WIFI_STA_LED
+#define WIFI_STA_LED F("[\
+  { \"" WIFI_STA_LED "\": {\"" ROUTE_PIN_NAME "\": \"WiFiLed\", \"" ROUTE_PIN_HIDDEN "\": true, \"" ROUTE_PIN_BLINKING "\": true, \"" ROUTE_PIN_BLINKING_UP "\": 5000, \"" ROUTE_PIN_BLINKING_DOWN "\": 250, \"" ROUTE_PIN_STATE "\": true }}\
+]")
+#endif
 
 #define OUTPUT_CONFIG F("[\
-/*D6*/{\"-1\": {\"" ROUTE_PIN_NAME "\": \"Relay\", \"" ROUTE_PIN_REVERSE "\": false, \"" ROUTE_PIN_VALUE "\": -1, \"" ROUTE_PIN_STATE "\": false }},\
-/*D6*/{\"-2\": {\"" ROUTE_PIN_NAME "\": \"Relay\", \"" ROUTE_PIN_REVERSE "\": false, \"" ROUTE_PIN_VALUE "\": -1, \"" ROUTE_PIN_STATE "\": false }},\
+  {          \"-1\": {\"" ROUTE_PIN_NAME "\": \"" OUTPUT_DOOR "\", \"" ROUTE_PIN_REVERSE "\": false,                \"" ROUTE_PIN_VALUE "\": -1, \"" ROUTE_PIN_STATE "\": false }},\
+  {          \"-2\": {\"" ROUTE_PIN_NAME "\": \""  INPUT_DOOR "\", \"" ROUTE_PIN_REVERSE "\": false,                \"" ROUTE_PIN_VALUE "\": -1, \"" ROUTE_PIN_STATE "\": false }},\
+  {\"" RELAYPIN "\": {\"" ROUTE_PIN_NAME "\": \"relay\",           \"" ROUTE_PIN_REVERSE "\": " RELAYPIN_REVERSE ", \"" ROUTE_PIN_VALUE "\": -1, \"" ROUTE_PIN_STATE "\": false, \"" ROUTE_PIN_HIDDEN "\": true }},\
+  {\"" SERVOPIN "\": {\"" ROUTE_PIN_NAME "\": \"servo\",           \"" ROUTE_PIN_REVERSE "\": " SERVOPIN_REVERSE ", \"" ROUTE_PIN_VALUE "\": -1, \"" ROUTE_PIN_STATE "\": false, \"" ROUTE_PIN_HIDDEN "\": true }}\
 ]")
 
-#ifdef POWER_LED_NAME
-#define POWER_LED F("[\
-/*D0*/{\"16\": {\"" ROUTE_PIN_NAME "\": \"PowerLed\", \"" ROUTE_PIN_HIDDEN "\": true, \"" ROUTE_PIN_BLINKING "\": true, \"" ROUTE_PIN_BLINKING_UP "\": 1000, \"" ROUTE_PIN_BLINKING_DOWN "\": 0, \"" ROUTE_PIN_STATE "\": true }}\
-]")
-#endif
-
-#ifdef WIFI_STA_LED_NAME
-#define WIFI_STA_LED F("[\
-/*D1*/{ \"5\": {\"" ROUTE_PIN_NAME "\": \"WiFiLed\", \"" ROUTE_PIN_HIDDEN "\": true, \"" ROUTE_PIN_BLINKING "\": true, \"" ROUTE_PIN_BLINKING_UP "\": 5000, \"" ROUTE_PIN_BLINKING_DOWN "\": 250, \"" ROUTE_PIN_STATE "\": true }}\
-]")
-#endif
-
-//#endif
-#endif
+#define INPUT_CONFIG F("[{\"" SWITCH "", \"" ROUTE_PIN_NAME "\": \"switch\"}]")
 
 #endif
 
+#endif
