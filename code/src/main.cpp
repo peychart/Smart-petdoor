@@ -104,7 +104,7 @@ void IRAM_ATTR onTimerISR() {
   }else{
     v=(angle>180 ?180 :angle); v=(minPeriodUs*milliTips) + (v*milliTips*(maxPeriodUs-minPeriodUs)/180); v/=1000;
     timer1_write( v );
-  }myPins( SERVOPIN ).set(v);
+  }myPins( SERVO ).set(v);
 }
 
 void reboot() {
@@ -118,7 +118,7 @@ void onWiFiConnect() {
 
 void onStaConnect() {
 #ifdef WIFI_STA_LED
-  myPins(WIFI_STA_LED_NAME).set(true);
+  myPins(WIFI_STA_LED).set(true);
 #endif
 }
 
@@ -143,7 +143,7 @@ void ifWiFiConnected() {
 
 void onStaDisconnect() {
 #ifdef WIFI_STA_LED
-  myPins(WIFI_STA_LED_NAME).set(false);
+  myPins(WIFI_STA_LED).set(false);
 #endif
 }
 
@@ -185,7 +185,7 @@ void ajustAngle(bool set=true, volatile unsigned short Angle=0){
   if( angle==target) {
     next_angle=0L;
     return;
-  }myPins(RELAYPIN).set( true, 1000UL); // RELAY is on for 1s (at least)...
+  }myPins(RELAY).set( true, 1000UL); // RELAY is on for 1s (at least)...
 
   if (set &&_isNow(next_angle)){
     if ( _isNow( ((unsigned long)(target-angle)*delta) + next_angle ) )
@@ -252,8 +252,10 @@ void setup() {
   (myPins.mustRestore() ?myPins.set() :myPins.set(false)).mustRestore(false).saveToSD();
   if( myPins.exist(1) || myPins.exist(3) ) Serial.end();
   #ifdef POWER_LED
-    myPins.gpio(POWER_LED).set();
+    myPins(POWER_LED).set(true);
   #endif
+  myPins(OUTPUT_DOOR).onPinChange(onSwitch); myPins(INPUT_DOOR).onPinChange(onSwitch);
+
   #ifdef DEBUG
     for(auto &x : myPins) DEBUG_print((x.serializeJson() + G("\n")).c_str());
   #endif
