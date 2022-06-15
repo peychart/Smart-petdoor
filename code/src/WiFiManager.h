@@ -38,7 +38,7 @@
 #ifndef HEADER_FB324C728556321
 #define HEADER_FB324C728556321
 
-#define DEBUG
+//#define DEBUG
 //#define ALLOW_TELNET_DEBUG
 
 #include <Arduino.h>
