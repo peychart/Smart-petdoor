@@ -29,6 +29,9 @@ const short int maxPeriodUs = 2350; //-> 2350 us
 const short int totalPeriod = 20;   //-> ms
 */
 
+//#define DEBUG
+//#define ALLOW_TELNET_DEBUG
+
 #define _MAIN_
 #include <Arduino.h>
 #include <Timezone.h>
@@ -40,9 +43,10 @@ const short int totalPeriod = 20;   //-> ms
 #include "debug.h"                  //<-- telnet and serial debug traces
 
 #define INFINY                      60000UL
+#define DEBOUNCE_DELAY              50UL  //(ms)
 
-#ifdef WIFI
 #include "untyped.h"                //<-- de/serialization object for JSON communications and backups on SD card
+
 #include <ESP8266HTTPUpdateServer.h>
 #include "WiFiManager.h"            //<-- WiFi connection manager
 WiFiManager                         myWiFi;
@@ -50,10 +54,15 @@ ESP8266WebServer                    ESPWebServer(80);
 ESP8266HTTPUpdateServer             httpUpdater;
 
 #include "pins.h"
-pinsMap                          myPins;
+pinsMap                             myPins;
 
-#include "webPage.h"                //<-- definition of a web interface
-
+#ifdef WEBGUI
+  #include "webPage.h"                //<-- definition of a web interface
+#else
+  void setupWebServer ( void ) {};
+#endif
+typedef long unsigned int           ulong;
+typedef short unsigned int          ushort;
 volatile bool                       intr(false);
 volatile ulong                      rebound_completed(0L);
 
@@ -69,20 +78,16 @@ bool                                daylight(DEFAULTDAYLIGHT);
   mqtt                              myMqtt;
 #endif
 
-#endif
-
+#define WiFi_WAKING_TIME            120000UL
+unsigned long                       next_state(0UL), next_lightSleep(WiFi_WAKING_TIME);
+byte                                currentLockState(-1), nextLockstate(0);
 untyped                             calendar;
-unsigned long                       next_set;
-short int                           next_state;
 
-inline static bool  _isNow( unsigned long v )    {unsigned long ms(millis()); return(v && (v<ms) && (ms-v)<60000UL);};  //<-- Because of millis() rollover.
+inline static bool  _isNow( unsigned long v )    {unsigned long ms(millis()); return((v<ms) && (ms-v)<60000UL);};  //<-- Because of millis() rollover.
 inline ulong         Now()                       {return( timeClient.isTimeSet() ?myTZ->toLocal(timeClient.getEpochTime()) :(millis()/1000UL) );}
-inline bool          isSynchronizedTime(ulong t) {return(t>-1UL/10UL);}
-inline bool          isSynchronizedTime(void)    {return(Now()>-1UL/10UL);}
 
 
-const unsigned long delta = 5L;
-volatile unsigned short angle(90-delta);
+volatile unsigned short servoTarget(90);
 const short int minPeriodUs = 800;  //-> 800 us
 const short int maxPeriodUs = 2350; //-> 2350 us
 const short int totalPeriod = 20;   //-> ms
@@ -96,16 +101,23 @@ void initTimer() {
   timer1_write( totalPeriod * milliTips );
 }
 
+//Gestion des switchs/Switches management
+void IRAM_ATTR debouncedInterrupt(){intr = true;}
+
 void IRAM_ATTR onTimerISR() {
   static unsigned int v(0);
   if( v ) {
     timer1_write( totalPeriod * milliTips - v ); // 20000us/(1/80MHz*TIM_DIV16)) - v -> Freq. = 1/20ms
     v=0;
   }else{
-    v=(angle>180 ?180 :angle); v=(minPeriodUs*milliTips) + (v*milliTips*(maxPeriodUs-minPeriodUs)/180); v/=1000;
+    v=(servoTarget>180 ?180 :servoTarget); v=(minPeriodUs*milliTips) + (v*milliTips*(maxPeriodUs-minPeriodUs)/180); v/=1000;
     timer1_write( v );
   }myPins( SERVO ).set(v);
 }
+
+inline void disableInput()  {myPins(SERVO).set(true, 2000UL); servoTarget= 25; currentLockState=2;}
+inline void openDoor()      {myPins(SERVO).set(true, 2000UL); servoTarget= 90; currentLockState=0;}
+inline void disableOutput() {myPins(SERVO).set(true, 2000UL); servoTarget=155; currentLockState=1;}
 
 void reboot() {
   DEBUG_print(F("Restart needed!...\n"));
@@ -113,16 +125,63 @@ void reboot() {
   ESP.restart();
 }
 
+void searchPreviousCron(){
+  static bool knownLockPosition(false);
+  if(currentLockState==-1 || !knownLockPosition){
+    knownLockPosition=true;
+    /* ... */ 
+    openDoor();
+} }
+
+void searchNextCron(){
+  if(timeClient.isTimeSet()){ time_t next; bool isDone(false);
+    for( size_t i=0; i<calendar.vectorSize(); i++) try{
+      auto cron = cron::make_cron( calendar[i]["date"].c_str() );
+      next = cron::cron_next(cron, Now());
+      if(next<Now()) continue;
+      if(!isDone || !_isNow(next_state - (next - Now()))){
+        isDone=true; next_state = next - Now();
+        nextLockstate = 0;
+        if(calendar[i]["cmd"][0]=='c' || calendar[i]["cmd"][0]=='C'){   // Close the Door:
+          if(calendar[i]["cmd"][5]=='I' || calendar[i]["cmd"][5]=='i')      // closeInput
+            nextLockstate = 2;
+          else if(calendar[i]["cmd"][5]=='O' || calendar[i]["cmd"][5]=='o') // closeOutput
+            nextLockstate = 1;
+    } } }catch(cron::bad_cronexpr const &ex) {};
+  }else{
+    if( !myWiFi.connected() ) myWiFi.connect();
+  }
+}
+
+void lightSleep(){
+  if(myWiFi.staConnected() &&_isNow(next_lightSleep) && !_isNow(next_state-WiFi_WAKING_TIME)){
+    next_lightSleep = millis() + WiFi_WAKING_TIME;
+    myWiFi.disconnect(0UL);
+  }
+}
+
 void onWiFiConnect() {
+  next_lightSleep = millis() + WiFi_WAKING_TIME;
 }
 
 void onStaConnect() {
+  timeClient.forceUpdate();
+  searchNextCron();
 #ifdef WIFI_STA_LED
   myPins(WIFI_STA_LED).set(true);
 #endif
 }
 
+void onApConnected(){
+  std::cout << "APConnected...\n";
+}
+
+void onApDisconnected(){
+  std::cout << "APDisconnected...\n";
+}
+
 void ifStaConnected() {
+  timeClient.update();
 #ifdef MQTT_SCHEMA
   static bool configSended(false);
   static byte retry(0);
@@ -134,11 +193,6 @@ void ifStaConnected() {
           break;
   } }
 #endif
-}
-
-void ifWiFiConnected() {
-  MDNS.update();
-  timeClient.update();
 }
 
 void onStaDisconnect() {
@@ -160,48 +214,45 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
 void onSwitch( void ) {
   static std::vector<bool> previous;
   byte i(0); for(auto &x : myPins){ // Search for the switched switch...
-    if(previous.size()<=i) previous.push_back(false);
-    if(previous[i] != x.isOn()){    // it's me!
-      previous[i] = x.isOn();
+    if(x.gpio()<0){                 // I'm virtual...
+      if(previous[i] != x.isOn()){  // It's me!
+        if(previous.size()<=i) previous.push_back(false);
+        previous[i] = x.isOn();
 
-    // Then do it ...
-      switch(i) {
-        case 0: // set OUTPUT
-          next_state = (x.isOn() ?-1 :-2); break;
-        case 1: // set INPPUT
-          next_state = (x.isOn() ? 1 : 2); break;
-      }next_set=millis();
+        // Then do it ...
+        switch(i){  // nextLockstate: bit1=input, bit0=output
+          case 0:   // set CLOSE OUTPUT
+            nextLockstate =  x.isOn()  + 2*(nextLockstate>1);
+            break;
+          case 1:   // set CLOSE INPPUT
+            nextLockstate = 2*x.isOn() + (nextLockstate%2);
+            break;
+        }next_state=millis();
 
-    //And say it!
-    #ifdef DEFAULT_MQTT_BROKER
-      myMqtt.send( x.isOn() ?G(PAYLOAD_ON) :G(PAYLOAD_OFF), STR(x.gpio()) + G("/" ROUTE_PIN_STATE) );
-#endif
-     return;
-  }else i++;
+        //And say it!
+        #ifdef DEFAULT_MQTT_BROKER
+          myMqtt.send( x.isOn() ?G(PAYLOAD_ON) :G(PAYLOAD_OFF), STR(x.gpio()) + G("/" ROUTE_PIN_STATE) );
+        #endif
+        return;
+      }else i++;
+} } }
+
+void setStateFromSwitch(){
+  if(intr) {
+    intr=0; delay(DEBOUNCE_DELAY); next_state=millis(); nextLockstate=currentLockState+1;
+    if( !myWiFi.connected() )  // WEB interface access...
+      myWiFi.connect();
 } }
 
-void ajustAngle(bool set=true, volatile unsigned short Angle=0){
-  static unsigned long next_angle=0L; volatile unsigned short target=90;
-  if( angle==target) {
-    next_angle=0L;
-    return;
-  }myPins(RELAY).set( true, 1000UL); // RELAY is on for 1s (at least)...
-
-  if (set &&_isNow(next_angle)){
-    if ( _isNow( ((unsigned long)(target-angle)*delta) + next_angle ) )
-      angle += (angle>target ?1 :-1);
-  }else{
-    target=angle;
-    next_angle = millis();
-}}
-inline void openDoor()      {ajustAngle(false, 90);}
-inline void enableOutput()  {openDoor();}             //Single-engine rules (door is open)...
-inline void disableOutput() {ajustAngle(false, 75);}  //Single-engine rules (only the output can be disabled)...
-inline void enableInput()   {openDoor();}             //Single-engine rules (door is open)...
-inline void disableInput()  {ajustAngle(false, 25);}  //Single-engine rules (only the input can be disabled)...
-
-//Gestion des switchs/Switches management
-void IRAM_ATTR debouncedInterrupt(){if(!intr){intr=true; rebound_completed = millis() + DEBOUNCE_TIME;}}
+void doorPositioning(){
+  setStateFromSwitch();
+  if( nextLockstate!=currentLockState && _isNow(next_state) ){
+    switch(nextLockstate){
+      case  1: disableOutput(); break;
+      case  2: disableInput();  break;
+      default: openDoor();      nextLockstate=0;  //Single-engine rules (only output XOR input can be disabled)...
+  }searchNextCron();
+} }
 
 // ***********************************************************************************************
 // **************************************** SETUP ************************************************
@@ -213,30 +264,27 @@ std::vector<std::string> pinFlashDef( String s ){ //Allows pins declaration on F
   return v;
 }
 
-void setup() {
-  //Serial.begin(115200);
-  Serial.begin(9600);
+void setup(){
+  Serial.begin(115200);
   while(!Serial);
+#ifdef DEBUG
+  delay(1000UL);
   Serial.print(F("\n\nChipID(")); Serial.print(ESP.getChipId()); Serial.print(F(") says: Hello World!\n\n"));
-
-  //attachInterrupt(digitalPinToInterrupt(COUNTERPIN), counterInterrupt, FALLING);
+#endif
 
   //initialisation du WiFi /WiFi init
-#ifdef WIFI
   for(ushort i(0); i<2; i++){
-    myWiFi.version        ( G(VERSION) )
-          .onConnect      ( onWiFiConnect )
-          .onStaConnect   ( onStaConnect )
-          .ifStaConnected ( ifStaConnected )
-          .ifConnected    ( ifWiFiConnected )
-          .onStaDisconnect( onStaDisconnect )
-          .hostname       ( G(DEFAULTHOSTNAME) )
-          .setOutputPower ( 17.5 )
-          .restoreFromSD  ();
+    myWiFi.version         ( G(VERSION) )
+          .onConnect       ( onWiFiConnect )
+          .onStaConnect    ( onStaConnect )
+          .onApConnect     ( onApConnected )
+          .ifStaConnected  ( ifStaConnected )
+          .onStaDisconnect ( onStaDisconnect )
+          .onApDisconnect  ( onApDisconnected )
+          .hostname        ( G(DEFAULTHOSTNAME) )
+          .setOutputPower  ( 17.5 )
+          .restoreFromSD   ();
     if( myWiFi.version() != G(VERSION) ){
-#ifndef DEBUG
-      myWiFi.clear();
-#endif
       if( !LittleFS.format() )
         DEBUG_print(F("LittleFS format failed!\n"));
     }else
@@ -246,26 +294,32 @@ void setup() {
   myWiFi.saveToSD();
   myWiFi.connect();
 
+//Pins init:
   myPins.set( pinFlashDef(OUTPUT_CONFIG) )
         .mode(OUTPUT)
         .restoreFromSD(F("out-gpio-"));
   (myPins.mustRestore() ?myPins.set() :myPins.set(false)).mustRestore(false).saveToSD();
-  if( myPins.exist(1) || myPins.exist(3) ) Serial.end();
+  //additional pin initializations:
+  myPins(OUTPUT_DOOR).onPinChange(onSwitch); myPins(INPUT_DOOR).onPinChange(onSwitch);
+  initTimer();  // SERVO
   #ifdef POWER_LED
     myPins(POWER_LED).set(true);
   #endif
-  myPins(OUTPUT_DOOR).onPinChange(onSwitch); myPins(INPUT_DOOR).onPinChange(onSwitch);
-
   #ifdef DEBUG
     for(auto &x : myPins) DEBUG_print((x.serializeJson() + G("\n")).c_str());
   #endif
 
-  initTimer();  // SERVO
+  // Input Pin:
+  myPins.set( pinFlashDef(INPUT_CONFIG) ); attachInterrupt(digitalPinToInterrupt(myPins(14).gpio()), debouncedInterrupt, FALLING);
+
+  if( myPins.exist(1) || myPins.exist(3) ){
+    DEBUG_print("Pins conflict: serial stopped!\n");
+    Serial.end();
+  }
 
    // Servers:
   setupWebServer();                    //--> Webui interface started...
   httpUpdater.setup( &ESPWebServer );  //--> OnTheAir (OTA) updates added...
-#endif
 
 #ifdef DEFAULT_MQTT_BROKER
 //initialisation du MQTT /MQTT init
@@ -279,10 +333,6 @@ void setup() {
   DEBUG_print(myMqtt.serializeJson().c_str()); DEBUG_print(F("\n"));
 #endif
 
-  //MDNS service:
-  MDNS.begin(myWiFi.hostname().c_str());
-  MDNS.addService("http", "tcp", 80);
-
   //NTP service:
   timeClient.setPoolServerName(ntpServer.c_str());
   timeClient.setUpdateInterval(NTP_UPDATE_INTERVAL_MS*1000UL);
@@ -294,54 +344,18 @@ void setup() {
   timeClient.begin();
 
   calendar.deserializeJson( String(CALENDAR).c_str() );
-  next_set=1UL; next_state=0;
+  searchPreviousCron();
 }
 
-void nextSet(){
-  if( _isNow(next_set) ){
-    switch(next_state){
-      case -2: disableOutput(); break;
-      case -1: enableOutput();  break;
-      case  1: enableInput();   break;
-      case  2: disableInput();  break;
-      default: openDoor();
-    }
-
-    if( isSynchronizedTime() ){
-      std::time_t nextSet(-1UL), next;
-      for( size_t i=0; i<calendar.vectorSize(); i++) try{
-        auto cron = cron::make_cron( calendar[i]["date"].c_str() );
-        next = cron::cron_next(cron, Now());
-        if( next < nextSet ){
-          nextSet = next;
-          // Set the Door:
-          next_state =  0;
-          if(calendar[i]["cmd"][0]=='o'){         // Open the Door:
-            if (calendar[i]["cmd"][4]=='I')       // openInput
-              next_state =  1;
-            else if (calendar[i]["cmd"][4]=='O')  // openOutput
-              next_state = -1;
-          }else if(calendar[i]["cmd"][0]=='c'){   // Close the Door:
-            if(calendar[i]["cmd"][5]=='I')        // closeInput
-              next_state =  2;
-            else  if (calendar[i]["cmd"][4]=='O') // closeOutput
-              next_state = -2;
-        } }
-      } catch(cron::bad_cronexpr const &ex) {};
-      next_set = ((nextSet != -1UL) ?nextSet :0);
-} } }
-
 // **************************************** LOOP *************************************************
-void loop() {
-#ifdef WIFI
+void loop(){
   ESPWebServer.handleClient(); delay(1L);             //WEB server
   myWiFi.loop();                                      //WiFi manager
+  myPins.timers();                                    //Pins timeout Management
+  doorPositioning();
 #ifdef DEFAULT_MQTT_BROKER
   myMqtt.loop();                                      //MQTT manager
 #endif
-#endif
-  nextSet();
-  ajustAngle();
+  lightSleep();
 }
 // ***********************************************************************************************
-

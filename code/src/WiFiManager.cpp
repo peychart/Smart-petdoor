@@ -31,7 +31,9 @@ namespace WiFiManagement {
                                 _changed(false),     _next_connect(0UL),    _trial_counter(_trialNbr),
                                 _apTimeout_counter(0) {
     json();
-    operator[](G(ROUTE_VERSION))   = G("0.0.0");
+    operator[](G(ROUTE_VERSION))   = G("0");
+    operator[](G(ROUTE_HOSTNAME))  = G("ESP8266");
+    operator[](G(ROUTE_PIN_VALUE)) = MIN_RECONNECTIONTIME;
     operator[](G(ROUTE_WIFI_SSID)) = untyped();
     operator[](G(ROUTE_WIFI_PWD))  = untyped();
     disconnect(0L);
@@ -113,6 +115,7 @@ namespace WiFiManagement {
         delay(500L);
         DEBUG_print(F("."));
       } DEBUG_print(F("\n"));
+
       if(staConnected()) { // Now connected:
         _trial_counter=_trialNbr;
         MDNS.begin(hostname().c_str());
@@ -210,7 +213,7 @@ namespace WiFiManagement {
       File file( LittleFS.open(F("/wifi.cfg"), "r" ));
       if( file ) {
             _changed = this->deserializeJson( file.readStringUntil('\n').c_str() ).empty();
-            file.close();
+            file.close(); hostname("");
             DEBUG_print(F("wifi.cfg restored.\n"));
       }else{DEBUG_print(F("Cannot read wifi.cfg!...\n"));}
       LittleFS.end();

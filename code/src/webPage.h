@@ -36,6 +36,9 @@
 extern ESP8266WebServer    ESPWebServer;
 extern WiFiManager         myWiFi;
 //extern pinsMap             myPins;
+#ifndef WEB_REFRESH_PERIOD
+  #define WEB_REFRESH_PERIOD "30" //(s)
+#endif
 #ifndef ACCESS_CONTROL_ALLOW_ORIGIN
   #define ACCESS_CONTROL_ALLOW_ORIGIN "*.home.lan"
 #endif

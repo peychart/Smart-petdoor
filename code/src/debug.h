@@ -14,11 +14,11 @@
   #include <WiFiClient.h>
 
     #ifdef _MAIN_
-    WiFiServer                    telnetServer(23);
-    WiFiClient                    telnetClient;
+      WiFiServer                    telnetServer(23);
+      WiFiClient                    telnetClient;
     #else
-    extern WiFiServer             telnetServer;
-    extern WiFiClient             telnetClient;
+      extern WiFiServer             telnetServer;
+      extern WiFiClient             telnetClient;
     #endif
 
     #define DEBUG_print(m)       {if(telnetClient && telnetClient.connected()) telnetClient.print (m);    Serial_print (m);  }

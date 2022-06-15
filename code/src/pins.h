@@ -41,6 +41,9 @@
 #ifndef HEADER_FB360F1A9606491
 #define HEADER_FB360F1A9606491
 
+//#define DEBUG
+//#define ALLOW_TELNET_DEBUG
+
 #include <Arduino.h>
 #include <LittleFS.h>
 #include "untyped.h"
@@ -51,6 +54,7 @@
 // Json name attributes:
 #ifndef ROUTE_PIN_NAME
   #define ROUTE_PIN_NAME           "name"
+  #define ROUTE_PIN_SWITCH         "switch"
   #define ROUTE_PIN_GPIO           "gpio"
   #define ROUTE_PIN_MODE           "mode"
   #define ROUTE_PIN_STATE          "state"

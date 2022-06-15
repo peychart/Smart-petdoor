@@ -25,9 +25,6 @@
 
 //Ajust the following:
 
-#define DEBUG
-//#define ALLOW_TELNET_DEBUG                            // NOT ENOUGH MEMORY, HERE!...
-
 #define VERSION                  "0.0.1"              //Change this value to reset current config on the next boot...
 #define DEFAULTHOSTNAME          "ESP8266"
 //NOTA: no SSID declared (in web interface) will qualify me as a slave candidate...
@@ -37,14 +34,12 @@
 #define WIFIAPDELAYRETRY        300000UL
 #define MEMORYLEAKS             5000L
 #define SSIDCount()             3
-#define WEB_REFRESH_PERIOD      20                  //(s)
+#define WEBGUI
 
 #define ACCESS_CONTROL_ALLOW_ORIGIN "*"
 #define EXCLUDED_IPV4_FROM_TUNE 192,168,0,253       //Update requests from this (IP & MASK) (HAProxy server?) are prohibited...
 #define EXCLUDED_MASK_FROM_TUNE 255,255,255,255     //Mask to exclude prohibited IPs (warning: ',' not '.')
 
-//#define WIFI
-#define WIFI
 #define WIFI_MEMORY_LEAKS         16800UL
 #define DEBOUNCE_TIME             25UL                //(ms) <- One switches treatments.
 
@@ -112,7 +107,6 @@ TimeChangeRule stdRule = {"CET",  Last, Sun, Oct, 1,  DEFAULTTIMEZONE * 60};
 #define DEFAULT_MQTT_BROKER      "mosquitto"
 */
 #ifdef  DEFAULT_MQTT_BROKER
-  #define WIFI
   #define DEFAULT_MQTT_PORT       1883
   #define DEFAULT_MQTT_IDENT     ""    // WARNING: must be different between devices on a same broker...
   #define DEFAULT_MQTT_USER      ""
@@ -144,11 +138,10 @@ TimeChangeRule stdRule = {"CET",  Last, Sun, Oct, 1,  DEFAULTTIMEZONE * 60};
 
 #define OUTPUT_DOOR       "output"
 #define INPUT_DOOR        "input"
-#define SWITCH            "switch"
 #define RELAY             "relay"
 #define SERVO             "servo"
-#define RELAYPIN_REVERSE  "false" //according hardware...
-#define SERVOPIN_REVERSE  "true"  //according hardware...
+#define RELAYPIN_REVERSE  "false"  //according hardware...
+#define SERVOPIN_REVERSE  "true"   //according hardware...
 //#define POWER_LED         "powerLed"
 //#define WIFI_STA_LED      "wifiLed"
 
@@ -165,13 +158,15 @@ TimeChangeRule stdRule = {"CET",  Last, Sun, Oct, 1,  DEFAULTTIMEZONE * 60};
 #endif
 
 #define OUTPUT_CONFIG F("[\
-  {/*virtual*/ \"-1\": {\"" ROUTE_PIN_NAME "\": \"" OUTPUT_DOOR "\", \"" ROUTE_PIN_REVERSE "\": false,                \"" ROUTE_PIN_VALUE "\": -1, \"" ROUTE_PIN_STATE "\": false }},\
-  {/*virtual*/ \"-2\": {\"" ROUTE_PIN_NAME "\": \"" INPUT_DOOR  "\", \"" ROUTE_PIN_REVERSE "\": false,                \"" ROUTE_PIN_VALUE "\": -1, \"" ROUTE_PIN_STATE "\": false }},\
-  {/*D2*/       \"4\": {\"" ROUTE_PIN_NAME "\": \"" RELAY       "\", \"" ROUTE_PIN_REVERSE "\": " RELAYPIN_REVERSE ", \"" ROUTE_PIN_VALUE "\": -1, \"" ROUTE_PIN_STATE "\": false, \"" ROUTE_PIN_HIDDEN "\": true }},\
-  {/*D4*/       \"2\": {\"" ROUTE_PIN_NAME "\": \"" SERVO       "\", \"" ROUTE_PIN_REVERSE "\": " SERVOPIN_REVERSE ", \"" ROUTE_PIN_VALUE "\": -1, \"" ROUTE_PIN_STATE "\": false, \"" ROUTE_PIN_HIDDEN "\": true }}\
+/*virtual*/ {\"-1\": {\"" ROUTE_PIN_NAME "\": \"" OUTPUT_DOOR "\", \"" ROUTE_PIN_REVERSE "\": false,                \"" ROUTE_PIN_VALUE "\": -1, \"" ROUTE_PIN_STATE "\": false}},\
+/*virtual*/ {\"-2\": {\"" ROUTE_PIN_NAME "\": \"" INPUT_DOOR  "\", \"" ROUTE_PIN_REVERSE "\": false,                \"" ROUTE_PIN_VALUE "\": -1, \"" ROUTE_PIN_STATE "\": false}},\
+/*D2*/      { \"4\": {\"" ROUTE_PIN_NAME "\": \"" RELAY       "\", \"" ROUTE_PIN_REVERSE "\": " RELAYPIN_REVERSE ", \"" ROUTE_PIN_VALUE "\": -1, \"" ROUTE_PIN_STATE "\": false, \"" ROUTE_PIN_HIDDEN "\": true}},\
+/*D4*/      { \"2\": {\"" ROUTE_PIN_NAME "\": \"" SERVO       "\", \"" ROUTE_PIN_REVERSE "\": " SERVOPIN_REVERSE ", \"" ROUTE_PIN_VALUE "\": -1, \"" ROUTE_PIN_STATE "\": false, \"" ROUTE_PIN_HIDDEN "\": true}}\
 ]")
 
-#define INPUT_CONFIG F("[{\"" SWITCH "", \"" ROUTE_PIN_NAME "\": \"switch\"}]")
+#define INPUT_CONFIG F("[\
+/*D5*/      {\"14\": {\"" ROUTE_PIN_NAME "\": \"switch\"}}\
+]")
 
 #endif
 

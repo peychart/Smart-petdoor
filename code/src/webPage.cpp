@@ -241,7 +241,7 @@ function getIpFromUrl(){if(!parameters." ROUTE_IP_ADDR ".length){\n\
  var p=url.searchParams.get('ip');\n\
  if(p.length)parameters." ROUTE_IP_ADDR "=p;\n\
 }}\n\
-function refresh(v=30){\n\
+function refresh(v=" WEB_REFRESH_PERIOD "){\n\
  clearTimeout(this.timer);document.getElementById('about').style.display='none';\n\
  if(v>0)this.timer=setTimeout(function(){RequestJsonDevice();refresh();},v*1000);\n}\n\
 function RequestJsonDevice(param){\n\
