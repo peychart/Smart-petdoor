@@ -45,17 +45,17 @@ void sendDeviceStatusToJS(){
   b[G(ROUTE_CHIP_IDENT)]        = STR(ESP.getChipId());
   b[G(ROUTE__DEFAULT_HOSTNAME)] = (G(DEFAULTHOSTNAME "-")+String(ESP.getChipId())).c_str();
   b[G(ROUTE__DEFAULT_PASSWORD)] = DEFAULTWIFIPASS;
-/*  for(size_t i=0; i<myWiFi.ssidCount(); i++)
+  for(size_t i=0; i<myWiFi.ssidCount(); i++)
     b[(ROUTE_WIFI_SSID)][i]     = myWiFi.ssid(i);
-  for(auto &x: myPins){
+  for(auto &x: myPins) if(!x.hidden()){
     b[G(ROUTE_PIN_GPIO)][STR(x.gpio())][G(ROUTE_PIN_NAME)]        = x.name();
     b[G(ROUTE_PIN_GPIO)][STR(x.gpio())][G(ROUTE_PIN_STATE)]       = x.isOn();
     b[G(ROUTE_PIN_GPIO)][STR(x.gpio())][G(ROUTE_PIN_REVERSE)]     = x.reverse();
     if(x.timeout()==-1UL)
           b[G(ROUTE_PIN_GPIO)][STR(x.gpio())][G(ROUTE_PIN_VALUE)] = -1L;
     else  b[G(ROUTE_PIN_GPIO)][STR(x.gpio())][G(ROUTE_PIN_VALUE)] = x.timeout();
-  }for(auto &x: myPins)
-    b[G("pinOrder")][b[G("pinOrder")].vectorSize()]=x.gpio();*/
+    b[G("pinOrder")][b[G("pinOrder")].vectorSize()]=x.gpio();
+  }
 #ifdef DEFAULT_MQTT_BROKER
   b[G(ROUTE_MQTT_BROKER)]       = myMqtt.broker();
   b[G(ROUTE_MQTT_PORT)]         = myMqtt.port();
@@ -84,7 +84,7 @@ void configDeviceFromJS() {
     untyped b; b.deserializeJson( ESPWebServer.argName(i).c_str() );
     DEBUG_print(F("JSON Request received: \"")); DEBUG_print(ESPWebServer.argName(i)); DEBUG_print(F("\"\n"));
     myWiFi.set(b).saveToSD();
-//    myPins.set(b).saveToSD();
+    myPins.set(b)/*.saveToSD()*/;
 #ifdef DEFAULT_MQTT_BROKER
     myMqtt.set(b).saveToSD();
 #endif

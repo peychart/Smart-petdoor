@@ -87,7 +87,9 @@ namespace WiFiManagement {
       DEBUG_print(F("\nNo custom SSID found: setting soft-AP configuration ... \n"));
       _apTimeout_counter=_apTimeout; _trial_counter=_trialNbr;
       WiFi.forceSleepWake(); delay(1L); WiFi.mode(WIFI_AP);
+#ifdef AP_GATEWAY
       WiFi.softAPConfig(AP_IPADDR, AP_GATEWAY, AP_SUBNET);
+#endif
       if( (_ap_connected=WiFi.softAP((hostname()+"-").c_str()+String(ESP.getChipId()), DEFAULTWIFIPASS)) ){
         DEBUG_print((G("Connecting \"") + hostname()+ G("\" [")).c_str() + WiFi.softAPIP().toString() + (G("] from: ") + hostname()).c_str() + G("-") + String(ESP.getChipId()) + G("/" DEFAULTWIFIPASS "\n\n"));
 
@@ -137,13 +139,13 @@ namespace WiFiManagement {
   }
 
   WiFiManager& WiFiManager::disconnect(ulong duration) {
-    bool previouslyConnected(false);
-    _next_connect = millis() + ((_enabled=duration) ?duration :reconnectionTime());
+    bool previouslyConnected(false); ulong d((_enabled=duration) ?duration :reconnectionTime());
+    _next_connect = millis() + d;
 
     if ( WiFiManager::apConnected() ) {
       previouslyConnected=true;
       WiFi.softAPdisconnect(); _ap_connected=false;
-      DEBUG_print(F("Wifi AP disconnected!...\n"));
+      DEBUG_print(F("Wifi AP disconnected (for: ")); DEBUG_print(d); DEBUG_print(F("ms)!...\n"));
       if(_on_apDisconnect) (*_on_apDisconnect)();
 
     }else if( WiFiManager::staConnected() ) {
@@ -213,7 +215,7 @@ namespace WiFiManagement {
       File file( LittleFS.open(F("/wifi.cfg"), "r" ));
       if( file ) {
             _changed = this->deserializeJson( file.readStringUntil('\n').c_str() ).empty();
-            file.close(); hostname("");
+            file.close();
             DEBUG_print(F("wifi.cfg restored.\n"));
       }else{DEBUG_print(F("Cannot read wifi.cfg!...\n"));}
       LittleFS.end();

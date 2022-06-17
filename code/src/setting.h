@@ -25,22 +25,21 @@
 
 //Ajust the following:
 
-#define VERSION                  "0.0.1"              //Change this value to reset current config on the next boot...
+#define VERSION                  "0.0.2"              //Change this value to reset current config on the next boot...
 #define DEFAULTHOSTNAME          "ESP8266"
 //NOTA: no SSID declared (in web interface) will qualify me as a slave candidate...
 #define DEFAULTWIFIPASS          "defaultPassword"
-#define WIFISTADELAYRETRY       30000UL
-#define MAXWIFIRETRY            2
-#define WIFIAPDELAYRETRY        300000UL
-#define MEMORYLEAKS             5000L
-#define SSIDCount()             3
+#define WIFISTADELAYRETRY         30000UL
+#define MAXWIFIRETRY              2
+#define WIFIAPDELAYRETRY          300000UL
+#define WIFI_MEMORY_LEAKS         16800UL
+#define SSIDCount()               3
 #define WEBGUI
 
 #define ACCESS_CONTROL_ALLOW_ORIGIN "*"
 #define EXCLUDED_IPV4_FROM_TUNE 192,168,0,253       //Update requests from this (IP & MASK) (HAProxy server?) are prohibited...
 #define EXCLUDED_MASK_FROM_TUNE 255,255,255,255     //Mask to exclude prohibited IPs (warning: ',' not '.')
 
-#define WIFI_MEMORY_LEAKS         16800UL
 #define DEBOUNCE_TIME             25UL                //(ms) <- One switches treatments.
 
 #define DEFAULTTIMEZONE           -10
@@ -139,33 +138,45 @@ TimeChangeRule stdRule = {"CET",  Last, Sun, Oct, 1,  DEFAULTTIMEZONE * 60};
 #define OUTPUT_DOOR       "output"
 #define INPUT_DOOR        "input"
 #define RELAY             "relay"
-#define SERVO             "servo"
+#define SERVO1            "servo1"
+//#define SERVO2            "servo2"  //Double-engine option
 #define RELAYPIN_REVERSE  "false"  //according hardware...
 #define SERVOPIN_REVERSE  "true"   //according hardware...
 //#define POWER_LED         "powerLed"
-//#define WIFI_STA_LED      "wifiLed"
+#define WIFI_STA_LED      "wifiLed"
 
-#ifdef POWER_LED
-#define POWER_LED F("[\
-  {/*D0*/ \"16\": {\"" ROUTE_PIN_NAME "\": \"" POWER_LED "\", \"" ROUTE_PIN_HIDDEN "\": true, \"" ROUTE_PIN_BLINKING "\": true, \"" ROUTE_PIN_BLINKING_UP "\": 1000, \"" ROUTE_PIN_BLINKING_DOWN "\": 0, \"" ROUTE_PIN_STATE "\": true }}\
+
+#define OUTPUT_CONFIG F("[\
+/*virtual*/  {\"-1\": {\"" ROUTE_PIN_NAME "\": \"" OUTPUT_DOOR "\", \"" ROUTE_PIN_REVERSE "\": false,                \"" ROUTE_PIN_VALUE "\": -1, \"" ROUTE_PIN_STATE "\": false, \"" ROUTE_PIN_HIDDEN "\": false}}\
+/*virtual*/ ,{\"-2\": {\"" ROUTE_PIN_NAME "\": \"" INPUT_DOOR  "\", \"" ROUTE_PIN_REVERSE "\": false,                \"" ROUTE_PIN_VALUE "\": -1, \"" ROUTE_PIN_STATE "\": false, \"" ROUTE_PIN_HIDDEN "\": false}}\
+/*D2*/      ,{ \"4\": {\"" ROUTE_PIN_NAME "\": \"" RELAY       "\", \"" ROUTE_PIN_REVERSE "\": " RELAYPIN_REVERSE ", \"" ROUTE_PIN_VALUE "\": -1, \"" ROUTE_PIN_STATE "\": false, \"" ROUTE_PIN_HIDDEN "\": true}}\
 ]")
+
+#define SERVO1_CONFIG F("[\
+/*D4*/       { \"2\": {\"" ROUTE_PIN_NAME "\": \"" SERVO1      "\", \"" ROUTE_PIN_REVERSE "\": " SERVOPIN_REVERSE ", \"" ROUTE_PIN_VALUE "\": -1, \"" ROUTE_PIN_STATE "\": false, \"" ROUTE_PIN_HIDDEN "\": true}}\
+]")
+#ifdef SERVO2
+#define SERVO2_CONFIG F("[\
+/*D3*/       { \"0\": {\"" ROUTE_PIN_NAME "\": \"" SERVO2      "\", \"" ROUTE_PIN_REVERSE "\": " SERVOPIN_REVERSE ", \"" ROUTE_PIN_VALUE "\": -1, \"" ROUTE_PIN_STATE "\": false, \"" ROUTE_PIN_HIDDEN "\": true}}\
+]")
+#else
+  #define SINGLE_SERVO     //Petdoor model with only one engine (-> disableInput XOR disableOutput)...
 #endif
 
 #ifdef WIFI_STA_LED
-#define WIFI_STA_LED F("[\
-  {/*D1*/ \"5\": {\"" ROUTE_PIN_NAME "\": \"" WIFI_STA_LED "\", \"" ROUTE_PIN_HIDDEN "\": true, \"" ROUTE_PIN_BLINKING "\": true, \"" ROUTE_PIN_BLINKING_UP "\": 5000, \"" ROUTE_PIN_BLINKING_DOWN "\": 250, \"" ROUTE_PIN_STATE "\": true }}\
+#define WIFI_LED_CONFIG F("[\
+/*D1*/      { \"5\": {\"" ROUTE_PIN_NAME "\": \"" WIFI_STA_LED "\", \"" ROUTE_PIN_STATE "\": false, \"" ROUTE_PIN_HIDDEN "\": true, \"" ROUTE_PIN_BLINKING "\": true, \"" ROUTE_PIN_BLINKING_UP "\": 250, \"" ROUTE_PIN_BLINKING_DOWN "\": 3000}}\
 ]")
 #endif
 
-#define OUTPUT_CONFIG F("[\
-/*virtual*/ {\"-1\": {\"" ROUTE_PIN_NAME "\": \"" OUTPUT_DOOR "\", \"" ROUTE_PIN_REVERSE "\": false,                \"" ROUTE_PIN_VALUE "\": -1, \"" ROUTE_PIN_STATE "\": false}},\
-/*virtual*/ {\"-2\": {\"" ROUTE_PIN_NAME "\": \"" INPUT_DOOR  "\", \"" ROUTE_PIN_REVERSE "\": false,                \"" ROUTE_PIN_VALUE "\": -1, \"" ROUTE_PIN_STATE "\": false}},\
-/*D2*/      { \"4\": {\"" ROUTE_PIN_NAME "\": \"" RELAY       "\", \"" ROUTE_PIN_REVERSE "\": " RELAYPIN_REVERSE ", \"" ROUTE_PIN_VALUE "\": -1, \"" ROUTE_PIN_STATE "\": false, \"" ROUTE_PIN_HIDDEN "\": true}},\
-/*D4*/      { \"2\": {\"" ROUTE_PIN_NAME "\": \"" SERVO       "\", \"" ROUTE_PIN_REVERSE "\": " SERVOPIN_REVERSE ", \"" ROUTE_PIN_VALUE "\": -1, \"" ROUTE_PIN_STATE "\": false, \"" ROUTE_PIN_HIDDEN "\": true}}\
+#ifdef POWER_LED
+#define POWER_LED_CONFIG F("[\
+/*D0*/      {\"16\": {\"" ROUTE_PIN_NAME "\": \"" POWER_LED "\", \"" ROUTE_PIN_STATE "\": true, \"" ROUTE_PIN_HIDDEN "\": true, \"" ROUTE_PIN_BLINKING "\": true, \"" ROUTE_PIN_BLINKING_UP "\": 1000, \"" ROUTE_PIN_BLINKING_DOWN "\": 5000}}\
 ]")
+#endif
 
 #define INPUT_CONFIG F("[\
-/*D5*/      {\"14\": {\"" ROUTE_PIN_NAME "\": \"switch\"}}\
+/*D5*/      {\"14\": {\"" ROUTE_PIN_NAME "\": \"switch\", \"" ROUTE_PIN_HIDDEN "\": true}\
 ]")
 
 #endif

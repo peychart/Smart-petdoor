@@ -38,7 +38,7 @@
 #ifndef HEADER_FB324C728556321
 #define HEADER_FB324C728556321
 
-//#define DEBUG
+#define DEBUG
 //#define ALLOW_TELNET_DEBUG
 
 #include <Arduino.h>
@@ -52,7 +52,7 @@
 #include "debug.h"
 
 #define AP_IPADDR             IPAddress(192,168,4,1)
-#define AP_GATEWAY            IPAddress(192,168,4,254)
+//#define AP_GATEWAY            IPAddress(192,168,4,254)
 #define AP_SUBNET             IPAddress(255,255,255,0)
 #define MIN_RECONNECTIONTIME  30000UL
 
@@ -74,6 +74,8 @@ namespace WiFiManagement {
   #define ROUTE_WIFI_PWD     "pwd"
 #endif
 
+typedef long unsigned int           ulong;
+
   class WiFiManager : public untyped {
     public:
       WiFiManager();
@@ -92,7 +94,7 @@ namespace WiFiManagement {
       inline ulong              reconnectionTime ( void )                   {return at(G(ROUTE_PIN_VALUE));};
       inline WiFiManager&       ssid             ( size_t i, std::string s ){if (i<ssidCount()) {_changed|=(ssid(i)!=s); at(G(ROUTE_WIFI_SSID)).vector().at(i) = s;}; return *this;};
       inline std::string        ssid             ( size_t i )               {if (i<ssidCount()) return at(G(ROUTE_WIFI_SSID)).vector().at(i).c_str();   return "";};
-      inline WiFiManager&       reconnectionTime ( ulong v )                {v=(v<MIN_RECONNECTIONTIME ?MIN_RECONNECTIONTIME :v);_changed|=(reconnectionTime()!=v); at(G(ROUTE_PIN_VALUE)) = v; return *this;};
+      inline WiFiManager&       reconnectionTime ( ulong v )                {_changed|=(reconnectionTime()!=v); at(G(ROUTE_PIN_VALUE)) = v; return *this;};
       inline WiFiManager&       password         ( size_t i, std::string p ){if (i<ssidCount()) push_back(ssid(i), p);  return *this;};
       inline std::string        password         ( size_t i )               {if (i<ssidCount()) return at(G(ROUTE_WIFI_PWD)).at(i).c_str(); return "";};
       WiFiManager&              erase            ( size_t );
@@ -143,7 +145,7 @@ namespace WiFiManagement {
       bool                      _changed;
       ulong                     _next_connect;
       byte                      _trial_counter, _apTimeout_counter;
-      const byte                _trialNbr=3, _apTimeout=10;
+      const byte                _trialNbr=2, _apTimeout=10;
 
       bool                      _apConnect();
 

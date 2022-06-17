@@ -29,7 +29,7 @@ const short int maxPeriodUs = 2350; //-> 2350 us
 const short int totalPeriod = 20;   //-> ms
 */
 
-//#define DEBUG
+#define DEBUG
 //#define ALLOW_TELNET_DEBUG
 
 #define _MAIN_
@@ -87,7 +87,7 @@ inline static bool  _isNow( unsigned long v )    {unsigned long ms(millis()); re
 inline ulong         Now()                       {return( timeClient.isTimeSet() ?myTZ->toLocal(timeClient.getEpochTime()) :(millis()/1000UL) );}
 
 
-volatile unsigned short servoTarget(90);
+volatile unsigned short servoTarget[2]={90,90};
 const short int minPeriodUs = 800;  //-> 800 us
 const short int maxPeriodUs = 2350; //-> 2350 us
 const short int totalPeriod = 20;   //-> ms
@@ -101,23 +101,54 @@ void initTimer() {
   timer1_write( totalPeriod * milliTips );
 }
 
+void IRAM_ATTR onTimerISR() {
+  static bool target[2];
+  static std::string servo[2];
+  static unsigned int d1(0), d2(0);
+  static byte i(-1);
+
+  switch(i++){
+    case 0:
+      d2=(servoTarget[target[1]]>180 ?180 :servoTarget[target[1]]); d2=(minPeriodUs*milliTips) + (d2*milliTips*(maxPeriodUs-minPeriodUs)/180); d2/=1000;
+      d1=(servoTarget[target[0]]>180 ?180 :servoTarget[target[0]]); d1=(minPeriodUs*milliTips) + (d1*milliTips*(maxPeriodUs-minPeriodUs)/180); d1/=1000;
+      timer1_write( d1 ); d2 -= d1;
+      if(servo[target[0]].length()) myPins( servo[target[0]] ).set(true);
+      break;
+    case 1:
+      timer1_write( d2 ); d2 += d1;
+      if(servo[target[1]].length()) myPins( servo[target[1]] ).set(true);
+      break;
+    default: i=-1;
+      if(servoTarget[0]<servoTarget[1])
+            target[0]=!(target[1]=1);
+      else  target[0]=!(target[1]=0);
+      servo[target[0]]=SERVO1;
+      #ifdef SINGLE_SERVO
+        servo[target[1]]="";
+      #else
+        servo[target[1]]=SERVO2;
+      #endif
+
+      timer1_write( totalPeriod * milliTips - d2 ); // 20000us/(1/80MHz*TIM_DIV16)) - v -> Freq. = 1/20ms
+      myPins( SERVO1 ).set(false);
+      #ifdef SERVO2
+        myPins( SERVO2 ).set(false);
+      #endif
+} }
+
 //Gestion des switchs/Switches management
 void IRAM_ATTR debouncedInterrupt(){intr = true;}
 
-void IRAM_ATTR onTimerISR() {
-  static unsigned int v(0);
-  if( v ) {
-    timer1_write( totalPeriod * milliTips - v ); // 20000us/(1/80MHz*TIM_DIV16)) - v -> Freq. = 1/20ms
-    v=0;
-  }else{
-    v=(servoTarget>180 ?180 :servoTarget); v=(minPeriodUs*milliTips) + (v*milliTips*(maxPeriodUs-minPeriodUs)/180); v/=1000;
-    timer1_write( v );
-  }myPins( SERVO ).set(v);
-}
-
-inline void disableInput()  {myPins(SERVO).set(true, 2000UL); servoTarget= 25; currentLockState=2;}
-inline void openDoor()      {myPins(SERVO).set(true, 2000UL); servoTarget= 90; currentLockState=0;}
-inline void disableOutput() {myPins(SERVO).set(true, 2000UL); servoTarget=155; currentLockState=1;}
+inline void openDoor()      {if(currentLockState!=0) myPins(RELAY).set(true, 2000UL); servoTarget[0] = servoTarget[1] = 90;   currentLockState=0;}
+#ifdef SINGLE_SERVO
+inline void disableInput()  {if(currentLockState!=2) myPins(RELAY).set(true, 2000UL); servoTarget[0] = 25; currentLockState=2;}
+inline void disableOutput() {if(currentLockState!=1) myPins(RELAY).set(true, 2000UL); servoTarget[0] =155; currentLockState=1;}
+inline void closeDoor()     {disableOutput();}
+#else
+inline void disableInput()  {if(currentLockState!=2) myPins(RELAY).set(true, 2000UL); servoTarget[1]=155;                     currentLockState=2;}
+inline void disableOutput() {if(currentLockState!=1) myPins(RELAY).set(true, 2000UL); servoTarget[2]= 25;                     currentLockState=1;}
+inline void closeDoor()     {if(currentLockState!=3) myPins(RELAY).set(true, 2000UL); servoTarget[0]= 25; servoTarget[1]=155; currentLockState=3;}
+#endif
 
 void reboot() {
   DEBUG_print(F("Restart needed!...\n"));
@@ -172,12 +203,25 @@ void onStaConnect() {
 #endif
 }
 
-void onApConnected(){
-  std::cout << "APConnected...\n";
-}
+#ifdef WIFI_MEMORY_LEAKS
+  struct tcp_pcb;
+  extern struct tcp_pcb* tcp_tw_pcbs;
+  extern "C" void tcp_abort (struct tcp_pcb* pcb);
+  inline void tcpCleanup(){while (tcp_tw_pcbs != NULL) tcp_abort(tcp_tw_pcbs);}
+#endif
 
-void onApDisconnected(){
-  std::cout << "APDisconnected...\n";
+void ifWiFiConnected() {
+#ifdef WIFI_MEMORY_LEAKS                            //No bug according to the ESP8266WiFi devs... but the device ended up rebooting!
+  ulong m=ESP.getFreeHeap();                        //(on lack of free memory, particularly quickly on DNS failures)
+  DEBUG_print(F("FreeMem: ")); DEBUG_print(m); DEBUG_print(F("\n"));
+  if( m < WIFI_MEMORY_LEAKS ){
+    ESPWebServer.stop(); ESPWebServer.close(); myWiFi.disconnect(1UL);
+    tcpCleanup();
+    ESPWebServer.begin();
+    DEBUG_print(F("TCP cleanup -> "));
+    DEBUG_print(F("FreeMem: ")); DEBUG_print(ESP.getFreeHeap()); DEBUG_print(F("\n"));
+  }
+#endif
 }
 
 void ifStaConnected() {
@@ -211,32 +255,6 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
 }
 #endif
 
-void onSwitch( void ) {
-  static std::vector<bool> previous;
-  byte i(0); for(auto &x : myPins){ // Search for the switched switch...
-    if(x.gpio()<0){                 // I'm virtual...
-      if(previous[i] != x.isOn()){  // It's me!
-        if(previous.size()<=i) previous.push_back(false);
-        previous[i] = x.isOn();
-
-        // Then do it ...
-        switch(i){  // nextLockstate: bit1=input, bit0=output
-          case 0:   // set CLOSE OUTPUT
-            nextLockstate =  x.isOn()  + 2*(nextLockstate>1);
-            break;
-          case 1:   // set CLOSE INPPUT
-            nextLockstate = 2*x.isOn() + (nextLockstate%2);
-            break;
-        }next_state=millis();
-
-        //And say it!
-        #ifdef DEFAULT_MQTT_BROKER
-          myMqtt.send( x.isOn() ?G(PAYLOAD_ON) :G(PAYLOAD_OFF), STR(x.gpio()) + G("/" ROUTE_PIN_STATE) );
-        #endif
-        return;
-      }else i++;
-} } }
-
 void setStateFromSwitch(){
   if(intr) {
     intr=0; delay(DEBOUNCE_DELAY); next_state=millis(); nextLockstate=currentLockState+1;
@@ -248,11 +266,65 @@ void doorPositioning(){
   setStateFromSwitch();
   if( nextLockstate!=currentLockState && _isNow(next_state) ){
     switch(nextLockstate){
-      case  1: disableOutput(); break;
-      case  2: disableInput();  break;
-      default: openDoor();      nextLockstate=0;  //Single-engine rules (only output XOR input can be disabled)...
+      case  1: disableOutput();
+        break;
+      case  2: disableInput();
+        break;
+      case  3:
+        #ifndef SINGLE_SERVO
+          disableDoor();
+          break;
+        #endif
+      default: openDoor();
+          #ifdef SINGLE_SERVO
+            nextLockstate=0;
+            myPins(OUTPUT_DOOR).set(false);
+            myPins( INPUT_DOOR).set(false);
+          #endif
   }searchNextCron();
 } }
+
+void onSwitch( void ) {
+  static std::vector<bool> previous;
+  if(!previous.size()) {previous.push_back(false);previous.push_back(false);previous.push_back(false);}
+  if(previous[0]) return;
+  previous[0] = true;
+  byte i(0); for(auto &x : myPins){ // Search for the switched switch...
+    if(!x.hidden()){
+      if(previous.size()<=++i) previous.push_back(false);
+      if(previous[i] != x.isOn()){  // It's me!
+        previous[i] = x.isOn();
+
+        // Then do it ...
+        switch(i){  // nextLockstate: bit1=input, bit0=output
+          case 1:   // set CLOSE OUTPUT
+            nextLockstate =  x.isOn();
+            #ifdef SINGLE_SERVO
+              if(x.isOn()) myPins(INPUT_DOOR).set((previous[2]=false));
+            #else
+              nextLockstate += ((nextLockstate/2)<<1);
+            #endif
+            break;
+          case 2:   // set CLOSE INPPUT
+            nextLockstate = (x.isOn()<<1);
+            #ifdef SINGLE_SERVO
+              if(x.isOn()) myPins(OUTPUT_DOOR).set((previous[1]=false));
+            #else
+              ; nextLockstate += (nextLockstate%2);
+            #endif
+            break;
+        }next_state=millis();
+
+        //And say it!
+        #ifdef DEFAULT_MQTT_BROKER
+          myMqtt.send( x.isOn() ?G(PAYLOAD_ON) :G(PAYLOAD_OFF), STR(x.gpio()) + G("/" ROUTE_PIN_STATE) );
+        #endif
+        
+        previous[0] = false;
+        return;
+  } } }
+  previous[0] = false;
+}
 
 // ***********************************************************************************************
 // **************************************** SETUP ************************************************
@@ -268,8 +340,8 @@ void setup(){
   Serial.begin(115200);
   while(!Serial);
 #ifdef DEBUG
-  delay(1000UL);
-  Serial.print(F("\n\nChipID(")); Serial.print(ESP.getChipId()); Serial.print(F(") says: Hello World!\n\n"));
+  delay(2000UL);
+  Serial.print( F("\n\nChipID(") ); Serial.print(ESP.getChipId()); Serial.print( F(") says: Hello World!\n\n") );
 #endif
 
   //initialisation du WiFi /WiFi init
@@ -277,47 +349,51 @@ void setup(){
     myWiFi.version         ( G(VERSION) )
           .onConnect       ( onWiFiConnect )
           .onStaConnect    ( onStaConnect )
-          .onApConnect     ( onApConnected )
+          .ifConnected     ( ifWiFiConnected )
           .ifStaConnected  ( ifStaConnected )
           .onStaDisconnect ( onStaDisconnect )
-          .onApDisconnect  ( onApDisconnected )
           .hostname        ( G(DEFAULTHOSTNAME) )
           .setOutputPower  ( 17.5 )
           .restoreFromSD   ();
     if( myWiFi.version() != G(VERSION) ){
+      myWiFi.clear();
       if( !LittleFS.format() )
-        DEBUG_print(F("LittleFS format failed!\n"));
+        DEBUG_print( F("LittleFS format failed!\n") );
     }else
       break;
-  }DEBUG_print(F("WiFi: ")); DEBUG_print(myWiFi.serializeJson().c_str()); DEBUG_print(F("\n"));
+  }DEBUG_print( F("WiFi: ") ); DEBUG_print(myWiFi.serializeJson().c_str()); DEBUG_print(F( ", ssidCount=") ); DEBUG_print(myWiFi.ssidCount()); DEBUG_print( F(".\n") );
   //myWiFi.clear().push_back("hello world", "password").saveToSD();  // only for DEBUG...
   myWiFi.saveToSD();
   myWiFi.connect();
 
-//Pins init:
-  myPins.set( pinFlashDef(OUTPUT_CONFIG) )
-        .mode(OUTPUT)
-        .restoreFromSD(F("out-gpio-"));
-  (myPins.mustRestore() ?myPins.set() :myPins.set(false)).mustRestore(false).saveToSD();
-  //additional pin initializations:
-  myPins(OUTPUT_DOOR).onPinChange(onSwitch); myPins(INPUT_DOOR).onPinChange(onSwitch);
-  initTimer();  // SERVO
+  //Pins init:
   #ifdef POWER_LED
-    myPins(POWER_LED).set(true);
+    myPins.set( pinFlashDef(POWER_LED_CONFIG) );
   #endif
-  #ifdef DEBUG
-    for(auto &x : myPins) DEBUG_print((x.serializeJson() + G("\n")).c_str());
+  #ifdef WIFI_STA_LED
+    myPins.set( pinFlashDef(WIFI_LED_CONFIG) );
   #endif
+  myPins.set( pinFlashDef(OUTPUT_CONFIG) ).set( pinFlashDef(SERVO1_CONFIG) );
+  #ifdef SERVO2
+    myPins.set( pinFlashDef(SERVO2_CONFIG) );
+  #endif
+  myPins.mode(OUTPUT);
+  myPins(OUTPUT_DOOR).onStateSettled(onSwitch); myPins(INPUT_DOOR).onStateSettled(onSwitch);
+    //additional pin initializations:
+  initTimer();  // SERVO config...
+      // Input Pin:
+  myPins.set( pinFlashDef(INPUT_CONFIG) ); myPins(14).mode(INPUT); attachInterrupt(digitalPinToInterrupt(myPins(14).gpio()), debouncedInterrupt, FALLING);
 
-  // Input Pin:
-  myPins.set( pinFlashDef(INPUT_CONFIG) ); attachInterrupt(digitalPinToInterrupt(myPins(14).gpio()), debouncedInterrupt, FALLING);
+#ifdef DEBUG
+  for(auto &x : myPins) DEBUG_print((x.serializeJson() + G("\n")).c_str());
+#endif
 
   if( myPins.exist(1) || myPins.exist(3) ){
-    DEBUG_print("Pins conflict: serial stopped!\n");
+    DEBUG_print( F("Pins conflict: serial stopped!\n") );
     Serial.end();
   }
 
-   // Servers:
+  // Servers:
   setupWebServer();                    //--> Webui interface started...
   httpUpdater.setup( &ESPWebServer );  //--> OnTheAir (OTA) updates added...
 
@@ -328,7 +404,7 @@ void setup(){
         .ident        ( String(F(DEFAULT_MQTT_IDENT)).length() ?G(DEFAULT_MQTT_IDENT) :String(ESP.getChipId(), DEC).c_str() )
         .user         ( G(DEFAULT_MQTT_USE3
   myMqtt.saveToSD();
-  for(auto x:myPins) myMqtt.subscribe( DEFAULT_MQTT_INTOPIC + STR(x.gpio()) + G("/" ROUTE_PIN_SWITCH) );
+  for(auto &x:myPins) myMqtt.subscribe( DEFAULT_MQTT_INTOPIC + STR(x.gpio()) + G("/" ROUTE_PIN_SWITCH) );
   myMqtt.setCallback( mqttCallback );
   DEBUG_print(myMqtt.serializeJson().c_str()); DEBUG_print(F("\n"));
 #endif

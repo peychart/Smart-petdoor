@@ -72,6 +72,9 @@
 #define G(n)                       String(F(n)).c_str()
 #endif
 
+typedef long unsigned int           ulong;
+typedef short unsigned int          ushort;
+
 namespace Pins {  static bool _master(false), _slave(false);
   class pin : public untyped {
     public:
@@ -124,10 +127,11 @@ namespace Pins {  static bool _master(false), _slave(false);
       bool                saveToSD              ( String = "" );
       bool                restoreFromSD         ( String = "" );
 
-      inline pin&         onTimeout             ( void(*f)() )       {_on_timeout=f;      return *this;};
-      inline pin&         onBlinkUp             ( void(*f)() )       {_on_blinkup=f;      return *this;};
-      inline pin&         onBlinkOut            ( void(*f)() )       {_on_blinkdown=f;    return *this;};
-      inline pin&         onPinChange           ( void(*f)() )       {_on_state_change=f; return *this;};
+      inline pin&         onTimeout             ( void(*f)() )       {_on_timeout=f;       return *this;};
+      inline pin&         onBlinkUp             ( void(*f)() )       {_on_blinkup=f;       return *this;};
+      inline pin&         onBlinkOut            ( void(*f)() )       {_on_blinkdown=f;     return *this;};
+      inline pin&         onPinChange           ( void(*f)() )       {_on_state_change=f;  return *this;};
+      inline pin&         onStateSettled        ( void(*f)() )       {_on_state_settled=f; return *this;};
 
     private:
       ulong              _counter, _nextBlink;      // delay counters;
@@ -137,6 +141,7 @@ namespace Pins {  static bool _master(false), _slave(false);
       void                (*_on_blinkup)();
       void                (*_on_blinkdown)();
       void                (*_on_state_change)();
+      void                (*_on_state_settled)();
 
       inline bool        _isActive              ( void )             {return (at(G(ROUTE_PIN_GPIO))>size_t(-32767));};
       bool               _restoreFromSD         ( String = "" );

@@ -23,10 +23,13 @@
 #ifndef HEADER_FB360F2C9804236
 #define HEADER_FB360F2C9804236
 
+//#define DEBUG
+//#define ALLOW_TELNET_DEBUG
+
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
 #include "WiFiManager.h"
-//#include "pins.h"
+#include "pins.h"
 //#include "mqtt.h"
 //#include "ntp.h"
 
@@ -35,7 +38,7 @@
 
 extern ESP8266WebServer    ESPWebServer;
 extern WiFiManager         myWiFi;
-//extern pinsMap             myPins;
+extern pinsMap             myPins;
 #ifndef WEB_REFRESH_PERIOD
   #define WEB_REFRESH_PERIOD "30" //(s)
 #endif

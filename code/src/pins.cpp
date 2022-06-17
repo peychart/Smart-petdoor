@@ -25,7 +25,7 @@
 namespace Pins
 {
   pin::pin(short g) : _counter(-1UL),   _nextBlink(-1UL), _changed(false),  _backupPrefix(""),
-                      _on_timeout(0),   _on_blinkup(0),   _on_blinkdown(0), _on_state_change(0) {
+                      _on_timeout(0),   _on_blinkup(0),   _on_blinkdown(0), _on_state_change(0), _on_state_settled(0) {
     json();
     operator[](G(ROUTE_PIN_GPIO))          = g;                // pin number
     operator[](G(ROUTE_PIN_NAME))          = ROUTE_PIN_SWITCH; // pin name
@@ -53,13 +53,14 @@ namespace Pins
       if( (at(G(ROUTE_PIN_STATE))=v) ){
         if(isEnabled()) startTimer(timer); else isEnabled(true);
       }else stopTimer();
-      if( isVirtual() )
+      if( isVirtual() ){
         _serialSendState();
-      else if( digitalRead(gpio()) != (isOn() xor reverse()) ){
+      }else if( digitalRead(gpio()) != (isOn() xor reverse()) ){
         digitalWrite( gpio(), isOn() xor reverse() );
         if( _on_state_change ) (*_on_state_change)();
-        DEBUG_print(G("GPIO \"") + String(name().c_str()) + G("(") + String(gpio(), DEC) + G(")\" is now ") + (isOn() ?G("on") :G("off")) + G(".\n"));
-      }if( mustRestore() ) saveToSD();
+      }if( _on_state_settled ) (*_on_state_settled)();
+      if( mustRestore() ) saveToSD();
+      DEBUG_print(G("GPIO \"") + String(name().c_str()) + G("(") + String(gpio(), DEC) + G(")\" is now ") + (isOn() ?G("on") :G("off")) + G(".\n"));
     }else{DEBUG_print(G("GPIO(") + String(gpio(), DEC) + G(")\" is not an output !...\n"));}
     return *this;
   }
