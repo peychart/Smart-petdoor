@@ -219,8 +219,8 @@ namespace noType
   uchar                       _type; /// WARNING: type must be < 32 [5+3 bits shared with desc(structure) in a char for the serialization methods...]
 
   inline void                 _set            ( size_t l,char const* v )        {std::string::assign(v, l);};
-  inline void                 _set            ( vectorType   const &v )         {for(size_t i(0); i<v.size(); i++) operator[](vectorSize())= v[i];};
-  inline void                 _set            ( mapType      const &v )         {for(mapType::const_iterator it=v.begin(); it!=v.end(); it++) operator[](it->first)= it->second;};
+  inline void                 _set            ( vectorType    const& v )        {for(size_t i(0); i<v.size(); i++) operator[](vectorSize())= v[i];};
+  inline void                 _set            ( mapType       const& v )        {for(mapType::const_iterator it=v.begin(); it!=v.end(); it++) operator[](it->first)= it->second;};
   static void                 _writeTypeAndStructure( std::ostream&, uchar, uchar const & );
   static inline void          _writeSize      ( std::ostream& o, size_t s )     {o.write( hton(s), sizeof(s) );};
   static uchar                _readTypeAndStructure ( std::istream&, uchar & );

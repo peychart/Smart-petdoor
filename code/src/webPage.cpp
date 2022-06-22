@@ -24,8 +24,8 @@
 
 void setupWebServer(){
   //Definition des URLs d'entree /Input URL definitions
-  ESPWebServer.on(F("/")                 ,[](){ handleRoot(); });
-  ESPWebServer.on(F("/status")           ,[](){ configDeviceFromJS(); sendDeviceStatusToJS(); });
+  ESPWebServer.on(F("/")                 ,[](){ handleRoot(); onWebServerRequest();});
+  ESPWebServer.on(F("/status")           ,[](){ configDeviceFromJS(); sendDeviceStatusToJS(); onWebServerRequest();});
   ESPWebServer.on(F("/" ROUTE_HTML_CODE) ,[](){ handleRoot(false); });
   ESPWebServer.on(F("/" ROUTE_RESTART)   ,[](){ ESPWebServer.send(200, F("text/html"), F("<meta http-equiv='refresh' content='15 ;URL=/'/>Rebooting...\n")); reboot(); });
 //ESPWebServer.on(F("/about")            ,[](){ ESPWebServer.send(200, F("text/plain"), getHelp()); });
@@ -82,7 +82,7 @@ void sendDeviceStatusToJS(){
 void configDeviceFromJS() {
   for(int i(0); i<ESPWebServer.args(); i++ ) {
     untyped b; b.deserializeJson( ESPWebServer.argName(i).c_str() );
-    DEBUG_print(F("JSON Request received: \"")); DEBUG_print(ESPWebServer.argName(i)); DEBUG_print(F("\"\n"));
+    DEBUG_print(F("JSON Request received: ")); DEBUG_print(ESPWebServer.argName(i)); DEBUG_print(F("\n"));
     myWiFi.set(b).saveToSD();
     myPins.set(b)/*.saveToSD()*/;
 #ifdef DEFAULT_MQTT_BROKER
@@ -108,15 +108,23 @@ void handleRoot( bool active ) {
 #ifndef EXTERN_WEBUI
     ESPWebServer.sendContent( F("<body onload='init();'>\n") );
     ESPWebServer.sendContent( HTML_AboutPopup() );
+    ESPWebServer.client().flush();
     ESPWebServer.sendContent( HTML_MainForm() );
+    ESPWebServer.client().flush();
     ESPWebServer.sendContent( HTML_ConfPopup() );
+    ESPWebServer.client().flush();
     ESPWebServer.sendContent( F("<!-==========JScript==========->\n<script>this.timer=0;parameters={'" ROUTE_IP_ADDR "':'") );
     ESPWebServer.sendContent( (active ?(myWiFi.apConnected() ?WiFi.softAPIP().toString() :WiFi.localIP().toString()) :String("")) + G("'};\n") );
     ESPWebServer.sendContent( HTML_JRefresh() );
+    ESPWebServer.client().flush();
     ESPWebServer.sendContent( HTML_JSubmits() );
+    ESPWebServer.client().flush();
     ESPWebServer.sendContent( HTML_JMainDisplay() );
+    ESPWebServer.client().flush();
     ESPWebServer.sendContent( HTML_JSSIDDisplay() );
+    ESPWebServer.client().flush();
     ESPWebServer.sendContent( HTML_JMQTTDisplay() );
+    ESPWebServer.client().flush();
     ESPWebServer.sendContent( F("</script>\n") );
 #endif
   }ESPWebServer.sendContent( F("</body>\n</html>\n\n") );

@@ -32,7 +32,7 @@
 #define WIFISTADELAYRETRY         30000UL
 #define MAXWIFIRETRY              2
 #define WIFIAPDELAYRETRY          300000UL
-#define WIFI_MEMORY_LEAKS         16800UL
+//#define WIFI_MEMORY_LEAKS         16800UL
 #define SSIDCount()               3
 #define WEBGUI
 
@@ -143,7 +143,7 @@ TimeChangeRule stdRule = {"CET",  Last, Sun, Oct, 1,  DEFAULTTIMEZONE * 60};
 #define RELAYPIN_REVERSE  "false"  //according hardware...
 #define SERVOPIN_REVERSE  "true"   //according hardware...
 //#define POWER_LED         "powerLed"
-#define WIFI_STA_LED      "wifiLed"
+//#define WIFI_STA_LED      "wifiLed"
 
 
 #define OUTPUT_CONFIG F("[\

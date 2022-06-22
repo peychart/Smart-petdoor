@@ -60,8 +60,10 @@ extern pinsMap             myPins;
 #ifndef G
   #define G(n)             String(F(n)).c_str()
 #endif
+#define STR(i)             std::string(String(i,DEC).c_str())
 
 void                       setupWebServer       ( void );
+void                       onWebServerRequest   ( void );
 void                       handleRoot           ( bool = true );
 #ifdef EXTERN_WEBUI
 String                     HTML_redirHeader     ( void );

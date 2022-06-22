@@ -73,6 +73,7 @@ namespace Pins
       File file( LittleFS.open(_backupPrefix + String( gpio(), DEC ) + G(".cfg"), "w" ));
       if( file ){
             _changed = !file.println( this->serializeJson().c_str() );
+            delay(1L);
             file.close();
             DEBUG_print(_backupPrefix + String(gpio(), DEC) + G(".cfg writed.\n"));
       }else{DEBUG_print(G("Cannot write ") + _backupPrefix + String(gpio(), DEC) + G(".cfg !...\n"));}

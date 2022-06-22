@@ -301,9 +301,9 @@ namespace noType
       case  1:
         if( that.isJson() ){
               out << (that.value<bool>() ?"true" :"false");
-        }else{  out << static_cast<bool>(that.value<bool>() );}       break;
+        }else{out << static_cast<bool>(that.value<bool>() );}         break;
       case  2:
-        if( that.isJson() ) out << '\'';
+        if( that.isJson() ) {out << '\'';}
         out << static_cast<char>(that.value<char>() );
         if( that.isJson() ) {out << '\'';}                            break;
       case  3:
@@ -399,7 +399,7 @@ namespace noType
   }
 
   untyped& untyped::deserialize( std::istream &in ){ if( isJson() ) return deserializeJson( in );
-    char c; uchar meta;
+    char c; uchar meta(0);
     size_t len;
     std::string::clear();
     switch( (_type=_readTypeAndStructure( in, meta )) ) {
@@ -508,7 +508,7 @@ namespace noType
         break;
       default  : 
       if(isgraph(c) || _isWhiteSpace(c) || c>='\xA0') ret+=c;
-    }return(c ?ret :untyped() );
+    }return(c ?ret :ret.clear() );
   }
 
   untyped untyped::_getJsonValue( std::istream &in, char &c, char readOneMore ) {
@@ -538,7 +538,7 @@ namespace noType
       default  : if( !_isWhiteSpace(c) )
         ret[ret.vectorSize()] = _getJsonValue(in, c, ']');
     }if(readOneMore && c==']') in.read( &c, 1 );
-    return( c ?ret :untyped() );
+    return( c ?ret :ret.clear() );
   }
 
   untyped untyped::_getJsonObject( std::istream &in, char &c, bool readOneMore ) {
@@ -566,7 +566,7 @@ namespace noType
           }else c='\0';
     }   }
     if(readOneMore && c=='}') in.read( &c, 1 );
-    return( c ?ret :untyped() );
+    return( c ?ret :ret.clear() );
   }
 
   untyped& untyped::deserializeJson( std::istream &in ) { //See: https://www.json.org/json-fr.html

@@ -41,9 +41,9 @@ namespace WiFiManagement {
 
   WiFiManager& WiFiManager::hostname(std::string s) {
     if( !s.empty() ) {
-      _changed|=(hostname()!=s);
+      _changed|=( map().find(G(ROUTE_HOSTNAME))==map().end() || (hostname()!=s) );
       at(G(ROUTE_HOSTNAME))=( s.substr(0,NAME_MAX_LEN-1) );
-    }if(hostname().empty()) hostname( G("ESP8266") );
+    }else hostname( G("ESP8266") );
     if(enabled()) disconnect(1L); // reconnect now...
     return *this;
   }
@@ -120,8 +120,10 @@ namespace WiFiManagement {
 
       if(staConnected()) { // Now connected:
         _trial_counter=_trialNbr;
+#ifdef MDNS
         MDNS.begin(hostname().c_str());
         MDNS.addService(F("http"), F("tcp"), 80);
+#endif
         //Affichage de l'adresse IP /print IP address:
         DEBUG_print(F("WiFi connected\nIP address: ")); DEBUG_print(WiFi.localIP()); DEBUG_print(F(", dns: ")); DEBUG_print(WiFi.dnsIP()); DEBUG_print(F("\n\n"));
 
@@ -150,9 +152,11 @@ namespace WiFiManagement {
 
     }else if( WiFiManager::staConnected() ) {
       previouslyConnected=true;
+#ifdef MDNS
       MDNS.end();
+#endif
       WiFi.disconnect();
-      DEBUG_print(F("Wifi STA disconnected!...\n"));
+      DEBUG_print(F("Wifi STA disconnected (for: ")); DEBUG_print(d); DEBUG_print(F("ms)!...\n"));
       if(_on_staDisconnect) (*_on_staDisconnect)();
     }
 
@@ -172,9 +176,9 @@ namespace WiFiManagement {
       if( !WiFiManager::connected() || (WiFiManager::apConnected() && ssidCount() && !_apTimeout_counter--) ){
         WiFiManager::connect();
       }else{  // Already connected:
-        if( staConnected() )
-          MDNS.update();
-
+#ifdef MDNS
+        if( staConnected() ) MDNS.update();
+#endif
         if( apConnected()  && _if_apConnected ) (*_if_apConnected)();
         if( staConnected() && _if_staConnected) (*_if_staConnected)();
         if(_if_connected) (*_if_connected)();
@@ -182,7 +186,7 @@ namespace WiFiManagement {
 
   WiFiManager& WiFiManager::set( untyped v ) {
     bool modified(false);
-    for(auto &x :v.map())
+    for(auto &x :v.map()){
       if( _isInWiFiManager( x.first ) ){
         if( x.first==ROUTE_WIFI_SSID ){
           for(size_t i(0); i<x.second.vector().size(); i++)
@@ -192,7 +196,7 @@ namespace WiFiManagement {
         }else{
           modified|=( at( x.first ) != x.second );
           this->operator+=( x );
-      } }
+    } } }
     return changed( modified );
   }
 
@@ -201,7 +205,7 @@ namespace WiFiManagement {
     if( LittleFS.begin() ) {
       File file( LittleFS.open(F("/wifi.cfg"), "w" ));
       if( file ) {
-            _changed = !file.println( this->serializeJson().c_str() );
+            _changed = !file.println( serializeJson().c_str() );
             file.close();
             DEBUG_print(F("wifi.cfg writed.\n"));
       }else DEBUG_print(F("Cannot write wifi.cfg!...\n"));
@@ -222,5 +226,4 @@ namespace WiFiManagement {
     }else{DEBUG_print(F("Cannot open SD!...\n"));}
     return !_changed;
   }
-  
 }

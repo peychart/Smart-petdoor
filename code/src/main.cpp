@@ -87,7 +87,7 @@ inline static bool  _isNow( unsigned long v )    {unsigned long ms(millis()); re
 inline ulong         Now()                       {return( timeClient.isTimeSet() ?myTZ->toLocal(timeClient.getEpochTime()) :(millis()/1000UL) );}
 
 
-volatile unsigned short servoTarget[2]={90,90};
+volatile ushort servoTarget[2]={90,90};
 const short int minPeriodUs = 800;  //-> 800 us
 const short int maxPeriodUs = 2350; //-> 2350 us
 const short int totalPeriod = 20;   //-> ms
@@ -102,31 +102,32 @@ void initTimer() {
 }
 
 void IRAM_ATTR onTimerISR() {
-  static bool target[2];
+  static bool nServo[2];
   static std::string servo[2];
   static unsigned int d1(0), d2(0);
-  static byte i(-1);
+  static byte i(1);
+  static ushort target[2];
 
-  switch(i++){
+  if(myPins(RELAY).isOn()) switch(++i){
     case 0:
-      d2=(servoTarget[target[1]]>180 ?180 :servoTarget[target[1]]); d2=(minPeriodUs*milliTips) + (d2*milliTips*(maxPeriodUs-minPeriodUs)/180); d2/=1000;
-      d1=(servoTarget[target[0]]>180 ?180 :servoTarget[target[0]]); d1=(minPeriodUs*milliTips) + (d1*milliTips*(maxPeriodUs-minPeriodUs)/180); d1/=1000;
+      d2=(target[nServo[1]]>180 ?180 :target[nServo[1]]); d2=(minPeriodUs*milliTips) + (d2*milliTips*(maxPeriodUs-minPeriodUs)/180); d2/=1000;
+      d1=(target[nServo[0]]>180 ?180 :target[nServo[0]]); d1=(minPeriodUs*milliTips) + (d1*milliTips*(maxPeriodUs-minPeriodUs)/180); d1/=1000;
       timer1_write( d1 ); d2 -= d1;
-      if(servo[target[0]].length()) myPins( servo[target[0]] ).set(true);
+      if(servo[nServo[0]][0]) myPins( servo[nServo[0]] ).set(true);
       break;
     case 1:
       timer1_write( d2 ); d2 += d1;
-      if(servo[target[1]].length()) myPins( servo[target[1]] ).set(true);
+      if(servo[nServo[1]][0]) myPins( servo[nServo[1]] ).set(true);
       break;
     default: i=-1;
-      if(servoTarget[0]<servoTarget[1])
-            target[0]=!(target[1]=1);
-      else  target[0]=!(target[1]=0);
-      servo[target[0]]=SERVO1;
+      if( (target[0]=servoTarget[0]) <= (target[1]-servoTarget[1]) )
+            nServo[0]=!(nServo[1]=1);
+      else  nServo[0]=!(nServo[1]=0);
+      servo[nServo[0]]=SERVO1;
       #ifdef SINGLE_SERVO
-        servo[target[1]]="";
+        servo[nServo[1]]="";
       #else
-        servo[target[1]]=SERVO2;
+        servo[nServo[1]]=SERVO2;
       #endif
 
       timer1_write( totalPeriod * milliTips - d2 ); // 20000us/(1/80MHz*TIM_DIV16)) - v -> Freq. = 1/20ms
@@ -139,15 +140,15 @@ void IRAM_ATTR onTimerISR() {
 //Gestion des switchs/Switches management
 void IRAM_ATTR debouncedInterrupt(){intr = true;}
 
-inline void openDoor()      {if(currentLockState!=0) myPins(RELAY).set(true, 2000UL); servoTarget[0] = servoTarget[1] = 90;   currentLockState=0;}
+inline void openDoor()    {if(currentLockState!=0) myPins(RELAY).set(true, 2000UL); servoTarget[0] = servoTarget[1] = 90;   currentLockState=0;}
 #ifdef SINGLE_SERVO
-inline void disableInput()  {if(currentLockState!=2) myPins(RELAY).set(true, 2000UL); servoTarget[0] = 25; currentLockState=2;}
-inline void disableOutput() {if(currentLockState!=1) myPins(RELAY).set(true, 2000UL); servoTarget[0] =155; currentLockState=1;}
-inline void closeDoor()     {disableOutput();}
+inline void closeInput()  {if(currentLockState!=2) myPins(RELAY).set(true, 2000UL); servoTarget[0] = 25; currentLockState=2;}
+inline void closeOutput() {if(currentLockState!=1) myPins(RELAY).set(true, 2000UL); servoTarget[0] =155; currentLockState=1;}
+inline void closeDoor()   {closeOutput();}
 #else
-inline void disableInput()  {if(currentLockState!=2) myPins(RELAY).set(true, 2000UL); servoTarget[1]=155;                     currentLockState=2;}
-inline void disableOutput() {if(currentLockState!=1) myPins(RELAY).set(true, 2000UL); servoTarget[2]= 25;                     currentLockState=1;}
-inline void closeDoor()     {if(currentLockState!=3) myPins(RELAY).set(true, 2000UL); servoTarget[0]= 25; servoTarget[1]=155; currentLockState=3;}
+inline void closeInput()  {if(currentLockState!=2) myPins(RELAY).set(true, 2000UL); servoTarget[1]=155;                     currentLockState=2;}
+inline void closeOutput() {if(currentLockState!=1) myPins(RELAY).set(true, 2000UL); servoTarget[2]= 25;                     currentLockState=1;}
+inline void closeDoor()   {if(currentLockState!=3) myPins(RELAY).set(true, 2000UL); servoTarget[0]= 25; servoTarget[1]=155; currentLockState=3;}
 #endif
 
 void reboot() {
@@ -165,10 +166,11 @@ void searchPreviousCron(){
 } }
 
 void searchNextCron(){
-  if(timeClient.isTimeSet()){ time_t next; bool isDone(false);
+  if(timeClient.isTimeSet()){ time_t next(0); bool isDone(false);
     for( size_t i=0; i<calendar.vectorSize(); i++) try{
-      auto cron = cron::make_cron( calendar[i]["date"].c_str() );
-      next = cron::cron_next(cron, Now());
+std::cout <<calendar[i]["date"].c_str()<<" "<<calendar[i]["cmd"].c_str()<<std::endl;
+//      auto cron = cron::make_cron( calendar[i]["date"].c_str() );      // MEMORY ERROR somewhere ... :-((
+//      next = cron::cron_next(cron, Now());
       if(next<Now()) continue;
       if(!isDone || !_isNow(next_state - (next - Now()))){
         isDone=true; next_state = next - Now();
@@ -181,15 +183,13 @@ void searchNextCron(){
     } } }catch(cron::bad_cronexpr const &ex) {};
   }else{
     if( !myWiFi.connected() ) myWiFi.connect();
-  }
-}
+} }
 
 void lightSleep(){
   if(myWiFi.staConnected() &&_isNow(next_lightSleep) && !_isNow(next_state-WiFi_WAKING_TIME)){
     next_lightSleep = millis() + WiFi_WAKING_TIME;
     myWiFi.disconnect(0UL);
-  }
-}
+} }
 
 void onWiFiConnect() {
   next_lightSleep = millis() + WiFi_WAKING_TIME;
@@ -266,21 +266,19 @@ void doorPositioning(){
   setStateFromSwitch();
   if( nextLockstate!=currentLockState && _isNow(next_state) ){
     switch(nextLockstate){
-      case  1: disableOutput();
+      case  1: closeOutput();
         break;
-      case  2: disableInput();
+      case  2: closeInput();
         break;
       case  3:
         #ifndef SINGLE_SERVO
-          disableDoor();
+          closeDoor();
           break;
         #endif
       default: openDoor();
-          #ifdef SINGLE_SERVO
-            nextLockstate=0;
-            myPins(OUTPUT_DOOR).set(false);
-            myPins( INPUT_DOOR).set(false);
-          #endif
+        #ifdef SINGLE_SERVO
+          nextLockstate=0;
+        #endif
   }searchNextCron();
 } }
 
@@ -326,6 +324,12 @@ void onSwitch( void ) {
   previous[0] = false;
 }
 
+#ifdef WEBGUI
+void onWebServerRequest(){
+    next_lightSleep = millis() + WiFi_WAKING_TIME;
+}
+#endif
+
 // ***********************************************************************************************
 // **************************************** SETUP ************************************************
 std::vector<std::string> pinFlashDef( String s ){ //Allows pins declaration on Flash...
@@ -338,7 +342,7 @@ std::vector<std::string> pinFlashDef( String s ){ //Allows pins declaration on F
 
 void setup(){
   Serial.begin(115200);
-  while(!Serial);
+  while(!Serial) {yield();};
 #ifdef DEBUG
   delay(2000UL);
   Serial.print( F("\n\nChipID(") ); Serial.print(ESP.getChipId()); Serial.print( F(") says: Hello World!\n\n") );
@@ -357,12 +361,14 @@ void setup(){
           .restoreFromSD   ();
     if( myWiFi.version() != G(VERSION) ){
       myWiFi.clear();
+      LittleFS.begin();
       if( !LittleFS.format() )
-        DEBUG_print( F("LittleFS format failed!\n") );
+        DEBUG_print( F("LittleFS formatting failed!\n") );
+      LittleFS.end();
     }else
       break;
   }DEBUG_print( F("WiFi: ") ); DEBUG_print(myWiFi.serializeJson().c_str()); DEBUG_print(F( ", ssidCount=") ); DEBUG_print(myWiFi.ssidCount()); DEBUG_print( F(".\n") );
-  //myWiFi.clear().push_back("hello world", "password").saveToSD();  // only for DEBUG...
+  //myWiFi.clear().push_back("myWiFiSSID", "myWiFiPassword").saveToSD();  // only for DEBUG...
   myWiFi.saveToSD();
   myWiFi.connect();
 
@@ -381,7 +387,7 @@ void setup(){
   myPins(OUTPUT_DOOR).onStateSettled(onSwitch); myPins(INPUT_DOOR).onStateSettled(onSwitch);
     //additional pin initializations:
   initTimer();  // SERVO config...
-      // Input Pin:
+    // Input Pin (manual switching of the door):
   myPins.set( pinFlashDef(INPUT_CONFIG) ); myPins(14).mode(INPUT); attachInterrupt(digitalPinToInterrupt(myPins(14).gpio()), debouncedInterrupt, FALLING);
 
 #ifdef DEBUG
@@ -394,8 +400,8 @@ void setup(){
   }
 
   // Servers:
-  setupWebServer();                    //--> Webui interface started...
   httpUpdater.setup( &ESPWebServer );  //--> OnTheAir (OTA) updates added...
+  setupWebServer();                    //--> Webui interface started...
 
 #ifdef DEFAULT_MQTT_BROKER
 //initialisation du MQTT /MQTT init

@@ -55,6 +55,7 @@
 //#define AP_GATEWAY            IPAddress(192,168,4,254)
 #define AP_SUBNET             IPAddress(255,255,255,0)
 #define MIN_RECONNECTIONTIME  30000UL
+//#define MDNS
 
 namespace WiFiManagement {
 #ifndef DEFAULTWIFIPASS
@@ -93,9 +94,9 @@ typedef long unsigned int           ulong;
       WiFiManager&              push_back        ( std::string, std::string );
       inline ulong              reconnectionTime ( void )                   {return at(G(ROUTE_PIN_VALUE));};
       inline WiFiManager&       ssid             ( size_t i, std::string s ){if (i<ssidCount()) {_changed|=(ssid(i)!=s); at(G(ROUTE_WIFI_SSID)).vector().at(i) = s;}; return *this;};
-      inline std::string        ssid             ( size_t i )               {if (i<ssidCount()) return at(G(ROUTE_WIFI_SSID)).vector().at(i).c_str();   return "";};
-      inline WiFiManager&       reconnectionTime ( ulong v )                {_changed|=(reconnectionTime()!=v); at(G(ROUTE_PIN_VALUE)) = v; return *this;};
-      inline WiFiManager&       password         ( size_t i, std::string p ){if (i<ssidCount()) push_back(ssid(i), p);  return *this;};
+      inline std::string        ssid             ( size_t i )               {if (i<ssidCount()) return at(G(ROUTE_WIFI_SSID)).vector().at(i).c_str(); return "";};
+      inline WiFiManager&       reconnectionTime ( ulong v )                {v=(v<MIN_RECONNECTIONTIME ?MIN_RECONNECTIONTIME :v);_changed|=(reconnectionTime()!=v); at(G(ROUTE_PIN_VALUE)) = v; return *this;};
+      inline WiFiManager&       password         ( size_t i, std::string p ){if (i<ssidCount()) push_back(ssid(i), p); return *this;};
       inline std::string        password         ( size_t i )               {if (i<ssidCount()) return at(G(ROUTE_WIFI_PWD)).at(i).c_str(); return "";};
       WiFiManager&              erase            ( size_t );
       inline WiFiManager&       clear            ( void )                   {if(ssidCount()) _changed=true; at(G(ROUTE_WIFI_SSID)).clear(); at(G(ROUTE_WIFI_PWD)).clear(); disconnect(0L); return *this;};

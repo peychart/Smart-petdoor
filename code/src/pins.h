@@ -41,7 +41,7 @@
 #ifndef HEADER_FB360F1A9606491
 #define HEADER_FB360F1A9606491
 
-//#define DEBUG
+#define DEBUG
 //#define ALLOW_TELNET_DEBUG
 
 #include <Arduino.h>
