@@ -10,4 +10,4 @@ Here are the C++ beta sources and 3D printing files of a connected cat flap :
 * rechargeable power supply via usb port
 * RFID chip recognition (coming soon) ...
 
-NOTE: This project is not yet functional (sources and STL)!
+WARNING: At this date, this project is not yet functional (sources and STL)!
