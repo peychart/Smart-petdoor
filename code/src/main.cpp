@@ -388,7 +388,7 @@ void setup(){
     //additional pin initializations:
   initTimer();  // SERVO config...
     // Input Pin (manual switching of the door):
-  myPins.set( pinFlashDef(INPUT_CONFIG) ); myPins(14).mode(INPUT); attachInterrupt(digitalPinToInterrupt(myPins("switch").gpio()), debouncedInterrupt, FALLING);
+  myPins.set( pinFlashDef(INPUT_CONFIG) ); myPins("switch").mode(INPUT); attachInterrupt(digitalPinToInterrupt(myPins("switch").gpio()), debouncedInterrupt, FALLING);
 
 #ifdef DEBUG
   for(auto &x : myPins) DEBUG_print((x.serializeJson() + G("\n")).c_str());
