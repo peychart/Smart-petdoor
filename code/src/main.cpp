@@ -169,8 +169,8 @@ void searchNextCron(){
   if(timeClient.isTimeSet()){ time_t next(0); bool isDone(false);
     for( size_t i=0; i<calendar.vectorSize(); i++) try{
 std::cout <<calendar[i]["date"].c_str()<<" "<<calendar[i]["cmd"].c_str()<<std::endl;
-//      auto cron = cron::make_cron( calendar[i]["date"].c_str() );      // MEMORY ERROR somewhere ... :-((
-//      next = cron::cron_next(cron, Now());
+      auto cron = cron::make_cron( calendar[i]["date"].c_str() );
+      next = cron::cron_next(cron, Now());
       if(next<Now()) continue;
       if(!isDone || !_isNow(next_state - (next - Now()))){
         isDone=true; next_state = next - Now();
