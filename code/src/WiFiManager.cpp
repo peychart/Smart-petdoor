@@ -134,7 +134,7 @@ namespace WiFiManagement {
     }
 
     if( ssidCount() && _trial_counter-- ) {
-      DEBUG_print(F("WiFi Timeout (")); DEBUG_print( _trial_counter ); DEBUG_print(F(" more attempt")); DEBUG_print((_trial_counter>1 ?"s" :"")); DEBUG_print(F(").\n\n"));
+      DEBUG_print(F("WiFi Timeout (")); DEBUG_print( _trial_counter+1 ); DEBUG_print(F(" more attempt")); DEBUG_print((_trial_counter>0 ?"s" :"")); DEBUG_print(F(").\n\n"));
       return false;
     }
     return WiFiManager::_apConnect();

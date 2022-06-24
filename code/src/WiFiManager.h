@@ -39,7 +39,8 @@
 #define HEADER_FB324C728556321
 
 #define DEBUG
-//#define ALLOW_TELNET_DEBUG
+#define ALLOW_TELNET_DEBUG
+#include "debug.h"
 
 #include <Arduino.h>
 #include <LittleFS.h>
@@ -49,7 +50,6 @@
 #include "untyped.h"
 
 #include "setting.h"
-#include "debug.h"
 
 #define AP_IPADDR             IPAddress(192,168,4,1)
 //#define AP_GATEWAY            IPAddress(192,168,4,254)

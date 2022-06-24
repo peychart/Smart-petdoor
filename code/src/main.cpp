@@ -28,11 +28,12 @@ const short int minPeriodUs = 800;  //-> 800 us
 const short int maxPeriodUs = 2350; //-> 2350 us
 const short int totalPeriod = 20;   //-> ms
 */
+#define _MAIN_
 
 #define DEBUG
-//#define ALLOW_TELNET_DEBUG
+#define ALLOW_TELNET_DEBUG
+#include "debug.h"                  //<-- telnet and serial debug traces
 
-#define _MAIN_
 #include <Arduino.h>
 #include <Timezone.h>
 #include <NTPClient.h>
@@ -40,7 +41,6 @@ const short int totalPeriod = 20;   //-> ms
 #include "croncpp.h"
 
 #include "setting.h"                //<--Can be adjusted according to the project...
-#include "debug.h"                  //<-- telnet and serial debug traces
 
 #define INFINY                      60000UL
 #define DEBOUNCE_DELAY              50UL  //(ms)
@@ -168,9 +168,9 @@ void searchPreviousCron(){
 void searchNextCron(){
   if(timeClient.isTimeSet()){ time_t next(0); bool isDone(false);
     for( size_t i=0; i<calendar.vectorSize(); i++) try{
-std::cout <<calendar[i]["date"].c_str()<<" "<<calendar[i]["cmd"].c_str()<<std::endl;
-      //auto cron = cron::make_cron( calendar[i]["date"].c_str() );      // memory pb at the moment...
-      //next = cron::cron_next(cron, Now());
+DEBUG_print(calendar[i]["date"].c_str()); DEBUG_print(" "); DEBUG_print(calendar[i]["cmd"].c_str()); DEBUG_print("\n");
+//      auto cron = cron::make_cron( calendar[i]["date"].c_str() );      // memory pb at the moment...
+//      next = cron::cron_next(cron, Now());
       if(next<Now()) continue;
       if(!isDone || !_isNow(next_state - (next - Now()))){
         isDone=true; next_state = next - Now();
@@ -193,14 +193,7 @@ void lightSleep(){
 
 void onWiFiConnect() {
   next_lightSleep = millis() + WiFi_WAKING_TIME;
-}
 
-void onStaConnect() {
-  timeClient.forceUpdate();
-  searchNextCron();
-#ifdef WIFI_STA_LED
-  myPins(WIFI_STA_LED).set(true);
-#endif
 }
 
 #ifdef WIFI_MEMORY_LEAKS
@@ -224,6 +217,18 @@ void ifWiFiConnected() {
 #endif
 }
 
+void onStaConnect() {
+  timeClient.forceUpdate();
+  searchNextCron();
+#ifdef WIFI_STA_LED
+  myPins(WIFI_STA_LED).set(true);
+#endif
+
+#ifdef ALLOW_TELNET_DEBUG
+  telnetBegin();
+#endif
+}
+
 void ifStaConnected() {
   timeClient.update();
 #ifdef MQTT_SCHEMA
@@ -237,11 +242,19 @@ void ifStaConnected() {
           break;
   } }
 #endif
+
+#ifdef ALLOW_TELNET_DEBUG
+  telnetManagement();
+#endif
 }
 
 void onStaDisconnect() {
 #ifdef WIFI_STA_LED
   myPins(WIFI_STA_LED).set(false);
+#endif
+
+#ifdef ALLOW_TELNET_DEBUG
+  telnetEnd();
 #endif
 }
 
@@ -426,7 +439,6 @@ void setup(){
   timeClient.begin();
 
   calendar.deserializeJson( String(CALENDAR).c_str() );
-  searchPreviousCron();
 }
 
 // **************************************** LOOP *************************************************

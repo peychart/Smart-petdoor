@@ -23,8 +23,9 @@
 #ifndef HEADER_FB360F2C9804236
 #define HEADER_FB360F2C9804236
 
-//#define DEBUG
-//#define ALLOW_TELNET_DEBUG
+#define DEBUG
+#define ALLOW_TELNET_DEBUG
+#include "debug.h"
 
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
@@ -34,7 +35,6 @@
 //#include "ntp.h"
 
 #include "setting.h"
-#include "debug.h"
 
 extern ESP8266WebServer    ESPWebServer;
 extern WiFiManager         myWiFi;

@@ -42,14 +42,14 @@
 #define HEADER_FB360F1A9606491
 
 #define DEBUG
-//#define ALLOW_TELNET_DEBUG
+#define ALLOW_TELNET_DEBUG
+#include "debug.h"
 
 #include <Arduino.h>
 #include <LittleFS.h>
 #include "untyped.h"
 
 #include "setting.h"
-#include "debug.h"
 
 // Json name attributes:
 #ifndef ROUTE_PIN_NAME
